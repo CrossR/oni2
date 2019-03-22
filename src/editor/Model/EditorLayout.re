@@ -20,6 +20,7 @@ let getLayout =
       ~pixelWidth: float,
       ~pixelHeight: float,
       ~isMinimapShown: bool,
+      ~maxMinimapWidth: int,
       ~characterWidth: float,
       ~characterHeight: float,
       ~bufferLineCount: int,
@@ -47,6 +48,9 @@ let getLayout =
        *
        * (c * characterWidth) + (c * minimapCharacterWidth) = availableWidthInPixels
        * c * (characterWidth + minimapCharacterWidth) = availableWidthInPixels
+       *
+       * When a maximum minimap width has been given, we need to cap the minimap
+       * width at that point, and add the excess to the buffer width.
        */
       int_of_float(
         availableWidthInPixels
@@ -59,9 +63,17 @@ let getLayout =
       int_of_float(availableWidthInPixels /. characterWidth);
     };
 
-  let bufferWidthInPixels = characterWidth *. float_of_int(widthInCharacters);
+  let (bufferWidthInCharacters, minimapWidthInCharacters) =
+    if (widthInCharacters > maxMinimapWidth) {
+      (widthInCharacters + (widthInCharacters - maxMinimapWidth), maxMinimapWidth);
+    } else {
+      (widthInCharacters, widthInCharacters);
+    };
+
+  let bufferWidthInPixels =
+    characterWidth *. float_of_int(bufferWidthInCharacters);
   let minimapWidthInPixels =
-    Constants.default.minimapCharacterWidth * widthInCharacters;
+    Constants.default.minimapCharacterWidth * minimapWidthInCharacters;
 
   let bufferHeightInCharacters = int_of_float(pixelHeight /. characterHeight);
   let minimapHeightInCharacters =
