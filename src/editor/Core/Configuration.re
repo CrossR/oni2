@@ -18,6 +18,8 @@ type t = {
   editorMinimapEnabled: bool,
   [@key "editor.minimap.showSlider"]
   editorMinimapShowSlider: bool,
+  [@key "editor.minimap.maxWidth"]
+  editorMinimapMaxWidth: int,
   [@key "editor.tablineMode"]
   editorTablineMode,
 };
@@ -25,6 +27,7 @@ type t = {
 let default = {
   editorMinimapEnabled: true,
   editorMinimapShowSlider: true,
+  editorMinimapMaxWidth: 80,
   editorTablineMode: Buffers,
   editorLineNumbers: Relative,
 };

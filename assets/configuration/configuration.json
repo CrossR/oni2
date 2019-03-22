@@ -2,5 +2,6 @@
   "editor.lineNumbers": ["relative"],
   "editor.minimap.enabled": true,
   "editor.minimap.showSlider": true,
+  "editor.minimap.maxWidth": 80,
   "editor.tablineMode": ["buffers"]
 }
