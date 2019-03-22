@@ -248,6 +248,7 @@ let createElement = (~state: State.t, ~children as _, ()) =>
         ~pixelWidth=float_of_int(state.editor.size.pixelWidth),
         ~pixelHeight=float_of_int(state.editor.size.pixelHeight),
         ~isMinimapShown=true,
+        ~maxMinimapWidth=state.configuration.editorMinimapMaxWidth,
         ~characterWidth=state.editorFont.measuredWidth,
         ~characterHeight=state.editorFont.measuredHeight,
         ~bufferLineCount=lineCount,
