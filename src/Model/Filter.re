@@ -39,12 +39,18 @@ let rank = (query, format, items) => {
 
   let search = (query, searchList) => {
     let (strings, items) = List.split(searchList);
+    Console.log("Starting search...");
     let matches = Fzy.fzySearchList(strings, query);
+    Console.log(matches);
+    Console.log("Finished search...");
 
     List.combine(matches, items)
   }
 
-  items |> List.map(processItem) |> search(query) |> List.map(makeResult);
+  switch(List.length(items), String.length(query)) {
+  | (0, 0) | (0, _) | (_, 0) => []
+  | (_, _) => items |> List.map(processItem) |> search(query) |> List.map(makeResult);
+  }
 };
 
 // Check whether the query matches...
