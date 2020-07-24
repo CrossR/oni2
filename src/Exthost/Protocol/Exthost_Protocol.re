@@ -1,7 +1,7 @@
 open Exthost_Transport;
 open Exthost_Extension;
 
-module Log = (val Timber.Log.withNamespace("Transport"));
+module Log = (val Timber.Log.withNamespace("Exthost.Protocol"));
 
 module ByteParser = {
   exception UInt32ConversionException;
@@ -69,9 +69,13 @@ module ByteParser = {
         let (argType, bytes) = readUInt8(bytes);
         if (argType == argString || argType == argBuffer) {
           let (str, bytes) = readLongString(bytes);
+          // It's weird, but... if the argument is a string, we need to parse it as JSON:
+          // https://github.com/onivim/vscode-exthost/blob/923c38b016c87a205957456e13c62f8dfd3bdc62/src/vs/workbench/services/extensions/common/rpcProtocol.ts#L710
+
+          // If it isn't meant to be JSON, we'll return it as a `String (which is the closet thing we have to 'buffer')
           let result =
             argType == argString
-              ? `String(str) : Yojson.Safe.from_string(str);
+              ? Yojson.Safe.from_string(str) : `String(str);
           [result, ...loop(bytes, idx + 1)];
         } else {
           [`Null, ...loop(bytes, idx + 1)];
@@ -97,7 +101,7 @@ module Message = {
     | Message(string);
 
   module Incoming = {
-    [@deriving (show, yojson({strict: false}))]
+    [@deriving show]
     type t =
       | Connected
       | Initialized
@@ -127,7 +131,7 @@ module Message = {
   };
 
   module Outgoing = {
-    [@deriving (show, yojson({strict: false}))]
+    [@deriving show]
     type t =
       | Initialize({
           requestId: int,
@@ -145,6 +149,10 @@ module Message = {
           requestId: int,
           json: Yojson.Safe.t,
         })
+      | ReplyOKBuffer({
+          requestId: int,
+          bytes: Bytes.t,
+        })
       | ReplyError({
           requestId: int,
           error: string,
@@ -157,13 +165,13 @@ module Message = {
   let requestJsonArgsWithCancellation = 2;
   let requestMixedArgs = 3;
   let requestMixedArgsWithCancellation = 4;
-  //  let acknowledged = 5;
+  let acknowledged = 5;
   //  let cancel = 6;
   let replyOkEmpty = 7;
-  //  let replyOkBuffer = 8;
+  let replyOkBuffer = 8;
   let replyOkJSON = 9;
   let replyErrError = 10;
-  //  let replyErrEmpty = 11;
+  let replyErrEmpty = 11;
 
   let ofPacket: Packet.t => result(Incoming.t, string) =
     (packet: Packet.t) => {
@@ -219,10 +227,17 @@ module Message = {
             );
           } else if (messageType == replyOkEmpty) {
             Ok(ReplyOk({requestId, payload: Empty}));
+          } else if (messageType == acknowledged) {
+            Ok(Acknowledged({requestId: requestId}));
+          } else if (messageType == replyOkBuffer) {
+            let (msg, _bytes) = ByteParser.readLongString(bytes);
+            Ok(ReplyOk({requestId, payload: Bytes(Bytes.of_string(msg))}));
           } else if (messageType == replyOkJSON) {
             let (msg, _bytes) = ByteParser.readLongString(bytes);
             let json = msg |> Yojson.Safe.from_string;
             Ok(ReplyOk({requestId, payload: Json(json)}));
+          } else if (messageType == replyErrEmpty) {
+            Ok(ReplyError({requestId, payload: Empty}));
           } else if (messageType == replyErrError) {
             let (msg, _bytes) = ByteParser.readLongString(bytes);
             Ok(ReplyError({requestId, payload: Message(msg)}));
@@ -245,6 +260,7 @@ module Message = {
       | RequestJSONArgs({requestId, _}) => requestId
       | ReplyOKEmpty({requestId, _}) => requestId
       | ReplyOKJSON({requestId, _}) => requestId
+      | ReplyOKBuffer({requestId, _}) => requestId
       | ReplyError({requestId, _}) => requestId
       | Terminate => Int.max_int;
     let requestId = getRequestId(msg) |> Int32.of_int;
@@ -278,11 +294,9 @@ module Message = {
       let bytes = Bytes.make(1, Char.chr(3));
       Packet.create(~bytes, ~packetType=Packet.Regular, ~id=packetId);
     | Initialize({initData, _}) =>
-      let bytes =
-        initData
-        |> InitData.to_yojson
-        |> Yojson.Safe.to_string
-        |> Bytes.of_string;
+      let str = initData |> InitData.to_yojson |> Yojson.Safe.to_string;
+
+      let bytes = str |> Bytes.of_string;
 
       Packet.create(~bytes, ~packetType=Packet.Regular, ~id=packetId);
     | RequestJSONArgs({rpcId, method, args, usesCancellationToken, _}) =>
@@ -303,9 +317,13 @@ module Message = {
       let reply = json |> Yojson.Safe.to_string;
       writeLongString(buffer, reply);
       bufferToPacket(~buffer);
+    | ReplyOKBuffer({bytes, _}) =>
+      writePreamble(~buffer, ~msgType=replyOkBuffer, ~requestId);
+      writeLongString(buffer, Bytes.to_string(bytes));
+      bufferToPacket(~buffer);
     | ReplyError({error, _}) =>
       writePreamble(~buffer, ~msgType=replyErrError, ~requestId);
-      writeLongString(buffer, error);
+      writeLongString(buffer, "\"" ++ error ++ "\"");
       bufferToPacket(~buffer);
     };
   };

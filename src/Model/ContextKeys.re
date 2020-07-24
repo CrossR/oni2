@@ -14,10 +14,8 @@ let menus =
       bool(
         "quickmenuCursorEnd",
         fun
-        | Some({selection, query, _})
-            when
-              Selection.isCollapsed(selection)
-              && selection.focus == String.length(query) =>
+        | Some({inputText, _})
+            when Feature_InputText.isCursorAtEnd(inputText) =>
           true
         | _ => false,
       ),
@@ -25,48 +23,53 @@ let menus =
   );
 
 let editors =
-  fromList([
-    bool("editorTextFocus", state =>
-      switch (ModeManager.current(state)) {
-      | TerminalInsert
-      | TerminalNormal
-      | TerminalVisual => false
-      | _ => true
-      }
-    ),
-    bool("terminalFocus", state =>
-      switch (ModeManager.current(state)) {
-      | TerminalInsert
-      | TerminalNormal
-      | TerminalVisual => true
-      | _ => false
-      }
-    ),
-    bool("commandLineFocus", state =>
-      ModeManager.current(state) == CommandLine
-    ),
-    bool("insertMode", state =>
-      switch (ModeManager.current(state)) {
-      | TerminalInsert
-      | Insert => true
-      | _ => false
-      }
-    ),
-    bool("normalMode", state =>
-      switch (ModeManager.current(state)) {
-      | TerminalNormal
-      | Normal => true
-      | _ => false
-      }
-    ),
-    bool("visualMode", state =>
-      switch (ModeManager.current(state)) {
-      | TerminalVisual
-      | Visual => true
-      | _ => false
-      }
-    ),
-  ]);
+  fromList(
+    State.[
+      bool("editorTextFocus", state =>
+        switch (ModeManager.current(state)) {
+        | TerminalInsert
+        | TerminalNormal
+        | TerminalVisual => false
+        | _ => true
+        }
+      ),
+      bool("terminalFocus", state =>
+        switch (ModeManager.current(state)) {
+        | TerminalInsert
+        | TerminalNormal
+        | TerminalVisual => true
+        | _ => false
+        }
+      ),
+      bool("commandLineFocus", state =>
+        ModeManager.current(state) == CommandLine
+      ),
+      bool("insertMode", state =>
+        switch (ModeManager.current(state)) {
+        | TerminalInsert
+        | Insert => true
+        | _ => false
+        }
+      ),
+      bool("normalMode", state =>
+        switch (ModeManager.current(state)) {
+        | TerminalNormal
+        | Normal => true
+        | _ => false
+        }
+      ),
+      bool("visualMode", state =>
+        switch (ModeManager.current(state)) {
+        | TerminalVisual
+        | Visual => true
+        | _ => false
+        }
+      ),
+      bool("parameterHintsVisible", state =>
+        Feature_SignatureHelp.isShown(state.signatureHelp)
+      ),
+    ],
+  );
 
 let other =
   fromList(
@@ -84,7 +87,7 @@ let other =
       bool("isWin", _state =>
         Revery.Environment.os == Revery.Environment.Windows
       ),
-      bool("sneakMode", state => Sneak.isActive(state.sneak)),
+      bool("sneakMode", state => Feature_Sneak.isActive(state.sneak)),
       bool("zenMode", state => state.zenMode),
       bool("keyDisplayerEnabled", state => state.keyDisplayer != None),
     ],
@@ -92,6 +95,11 @@ let other =
 
 let all =
   unionMany([
+    Feature_Registers.Contributions.contextKeys
+    |> fromList
+    |> map(({registers, _}: State.t) => registers),
+    Feature_LanguageSupport.Contributions.contextKeys
+    |> map(({languageSupport, _}: State.t) => languageSupport),
     menus |> map((state: State.t) => state.quickmenu),
     editors,
     other,

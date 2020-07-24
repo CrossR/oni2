@@ -54,6 +54,7 @@
            ZenModeSplitTest
     )
     (libraries
+        Oni_CLI
         Oni_IntegrationTestLib
         reason-native-crash-utils.asan
 ))
@@ -88,6 +89,7 @@
         InputIgnoreTest.exe
         LanguageCssTest.exe
         LanguageTypeScriptTest.exe
+        LineEndingsCRLFTest.exe
         LineEndingsLFTest.exe
         QuickOpenEventuallyCompletesTest.exe
         Regression1671Test.exe
@@ -116,6 +118,7 @@
         ZenModeSingleFileModeTest.exe
         ZenModeSplitTest.exe
         large-c-file.c
+        lsan.supp
         some-test-file.json
         some-test-file.txt
         test.crlf

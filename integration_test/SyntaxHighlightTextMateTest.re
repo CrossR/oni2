@@ -7,10 +7,10 @@ open Oni_IntegrationTestLib;
 // Validate that textmate highlight runs
 runTest(~name="SyntaxHighlightTextMateTest", (dispatch, wait, _runEffects) => {
   wait(~name="Capture initial state", (state: State.t) =>
-    state.vimMode == Vim.Types.Normal
+    Feature_Vim.mode(state.vim) == Vim.Types.Normal
   );
   wait(~name="Wait for syntax server", ~timeout=10.0, (state: State.t) => {
-    state.syntaxClient |> Option.is_some
+    Feature_Syntax.isSyntaxServerRunning(state.syntaxHighlights)
   });
 
   let testFile = getAssetPath("large-c-file.c");

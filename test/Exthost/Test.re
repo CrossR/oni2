@@ -15,11 +15,31 @@ type t = {
   messages: ref(list(Msg.t)),
 };
 
-let noopHandler = _ => None;
+let noopHandler = _ => Lwt.return(Reply.okEmpty);
 let noopErrorHandler = _ => ();
+
+let getExtensionManifest =
+    (
+      ~rootPath=Rench.Path.join(Sys.getcwd(), "test/collateral/extensions"),
+      name,
+    ) => {
+  name
+  |> Rench.Path.join(rootPath)
+  |> (
+    p =>
+      Rench.Path.join(p, "package.json")
+      |> Scanner.load(~category=Scanner.Bundled)
+      |> Option.map(({manifest, path, _}: Extension.Scanner.ScanResult.t) => {
+           InitData.Extension.ofManifestAndPath(manifest, path)
+         })
+      |> Option.get
+  );
+};
 
 let startWithExtensions =
     (
+      ~rootPath=Rench.Path.join(Sys.getcwd(), "test/collateral/extensions"),
+      ~initialConfiguration=Exthost.Configuration.empty,
       ~pid=Luv.Pid.getpid(),
       ~handler=noopHandler,
       ~onError=noopErrorHandler,
@@ -33,21 +53,18 @@ let startWithExtensions =
   };
 
   let wrappedHandler = msg => {
-    Msg.show(msg) |> prerr_endline;
+    prerr_endline("Received msg: " ++ Msg.show(msg));
     messages := [msg, ...messages^];
     handler(msg);
   };
 
   Timber.App.enable();
-  Timber.App.setLevel(Timber.Level.trace);
-
-  let rootPath = Rench.Path.join(Sys.getcwd(), "test/collateral/extensions");
 
   let extensions =
     extensions
     |> List.map(Rench.Path.join(rootPath))
     |> List.map(p => Rench.Path.join(p, "package.json"))
-    |> List.map(Scanner.load(~prefix=None, ~category=Scanner.Bundled))
+    |> List.map(Scanner.load(~category=Scanner.Bundled))
     |> List.filter_map(v => v)
     |> List.map((Extension.Scanner.ScanResult.{manifest, path, _}) => {
          InitData.Extension.ofManifestAndPath(manifest, path)
@@ -72,6 +89,7 @@ let startWithExtensions =
   let pipeStr = NamedPipe.toString(pipe);
   let client =
     Client.start(
+      ~initialConfiguration,
       ~namedPipe=pipe,
       ~initData,
       ~handler=wrappedHandler,
@@ -83,15 +101,18 @@ let startWithExtensions =
 
   let processHasExited = ref(false);
 
-  let onExit = (_, ~exit_status as _: int64, ~term_signal as _: int) => {
+  let onExit = (_, ~exit_status: int64, ~term_signal: int) => {
+    prerr_endline(
+      Printf.sprintf(
+        "Process exited: %d signal: %d",
+        Int64.to_int(exit_status),
+        term_signal,
+      ),
+    );
     processHasExited := true;
   };
 
-  let extHostScriptPath =
-    Rench.Path.join(
-      Sys.getcwd(),
-      "test/collateral/exthost/node_modules/@onivim/vscode-exthost/out/bootstrap-fork.js",
-    );
+  let extHostScriptPath = Setup.getNodeExtensionHostPath(Setup.init());
 
   let extensionProcess =
     Node.spawn(
@@ -146,11 +167,15 @@ let waitForReady = context => {
   waitForMessage(~name="Ready", msg => msg == Ready, context);
 };
 
+let waitForInitialized = context => {
+  waitForMessage(~name="Initialized", msg => msg == Initialized, context);
+};
+
 let waitForExtensionActivation = (expectedExtensionId, context) => {
   let waitForActivation =
     fun
     | Msg.ExtensionService(DidActivateExtension({extensionId, _})) =>
-      extensionId == expectedExtensionId
+      String.equal(extensionId, expectedExtensionId)
     | _ => false;
 
   context
@@ -186,6 +211,15 @@ let withClientRequest = (~name, ~validate, f, context) => {
   );
 
   context;
+};
+
+let activate = (~extensionId, ~reason, context) => {
+  context
+  |> withClientRequest(
+       ~name="Activating extension: " ++ extensionId,
+       ~validate=v => v,
+       Exthost.Request.ExtensionService.activate(~extensionId, ~reason),
+     );
 };
 
 let validateNoPendingRequests = context => {

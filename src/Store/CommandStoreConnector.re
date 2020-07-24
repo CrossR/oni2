@@ -13,65 +13,12 @@ module Constants = {
 };
 
 let start = () => {
-  let closeEditorEffect = (state, _) =>
-    Isolinear.Effect.createWithDispatch(~name="closeEditorEffect", dispatch => {
-      let editor =
-        Selectors.getActiveEditorGroup(state) |> Selectors.getActiveEditor;
-
-      switch (editor) {
-      | None => ()
-      | Some(v) => dispatch(ViewCloseEditor(v.editorId))
-      };
-    });
-
-  let splitEditorEffect = (state, direction, _) =>
-    Isolinear.Effect.createWithDispatch(~name="splitEditorEffect", dispatch => {
-      let buffer = Selectors.getActiveBuffer(state);
-
-      let newEditorGroup =
-        switch (buffer) {
-        | Some(b) =>
-          let ec = EditorGroup.create();
-          let (g, editorId) =
-            EditorGroup.getOrCreateEditorForBuffer(
-              ~font=state.editorFont,
-              ~bufferId=Buffer.getId(b),
-              ec,
-            );
-          let g = EditorGroup.setActiveEditor(g, editorId);
-          g;
-        | None => EditorGroup.create()
-        };
-
-      dispatch(AddSplit(direction, newEditorGroup.editorGroupId));
-
-      // This needs to be dispatched after the split, since this will set the
-      // active editor group, which is then used as the target for the split.
-      dispatch(EditorGroupAdd(newEditorGroup));
-    });
-
-  let windowMoveEffect = (state: State.t, direction, _) => {
-    Isolinear.Effect.createWithDispatch(~name="window.move", dispatch => {
-      let maybeEditorGroupId =
-        EditorGroups.getActiveEditorGroup(state.editorGroups)
-        |> Option.map((group: EditorGroup.t) =>
-             Feature_Layout.move(direction, group.editorGroupId, state.layout)
-           );
-
-      switch (maybeEditorGroupId) {
-      | Some(editorGroupId) =>
-        dispatch(Actions.EditorGroupSelected(editorGroupId))
-      | None => ()
-      };
-    });
-  };
-
   let togglePathEffect = name =>
     Isolinear.Effect.create(
       ~name,
       () => {
         let _ =
-          Oni_Extensions.NodeTask.run(
+          Oni_Core.NodeTask.run(
             ~setup=Oni_Core.Setup.init(),
             "add-to-path.js",
           );
@@ -106,16 +53,14 @@ let start = () => {
       };
     });
 
+  let openChangelogEffect = _ =>
+    Isolinear.Effect.createWithDispatch(~name="oni.changelog", dispatch => {
+      dispatch(OpenFileByPath(BufferPath.changelog, None, None))
+    });
+
   let commands = [
     ("system.addToPath", _ => togglePathEffect),
     ("system.removeFromPath", _ => togglePathEffect),
-    ("view.closeEditor", state => closeEditorEffect(state)),
-    ("view.splitVertical", state => splitEditorEffect(state, `Vertical)),
-    ("view.splitHorizontal", state => splitEditorEffect(state, `Horizontal)),
-    ("window.moveLeft", state => windowMoveEffect(state, Left)),
-    ("window.moveRight", state => windowMoveEffect(state, Right)),
-    ("window.moveUp", state => windowMoveEffect(state, Up)),
-    ("window.moveDown", state => windowMoveEffect(state, Down)),
     (
       "workbench.action.zoomIn",
       state => zoomEffect(state, zoom => zoom +. Constants.zoomStep),
@@ -128,6 +73,7 @@ let start = () => {
       "workbench.action.zoomReset",
       state => zoomEffect(state, _zoom => Constants.defaultZoomValue),
     ),
+    ("oni.changelog", _ => openChangelogEffect),
   ];
 
   let commandMap =

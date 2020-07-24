@@ -5,7 +5,7 @@ open Oni_IntegrationTestLib;
 
 runTest(~name="LineEndingsCRLFTest", (dispatch, wait, _runEffects) => {
   wait(~name="Capture initial state", (state: State.t) =>
-    state.vimMode == Vim.Types.Normal
+    Feature_Vim.mode(state.vim) == Vim.Types.Normal
   );
 
   let testFile = getAssetPath("test.crlf");
@@ -24,7 +24,7 @@ runTest(~name="LineEndingsCRLFTest", (dispatch, wait, _runEffects) => {
   });
 
   // Switch line endings
-  Vim.command("set ff=unix");
+  dispatch(Actions.VimExecuteCommand("set ff=unix"));
 
   // Verify buffer now has LF line endings...
   wait(

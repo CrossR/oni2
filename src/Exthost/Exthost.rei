@@ -5,6 +5,16 @@ module Extension = Exthost_Extension;
 module Protocol = Exthost_Protocol;
 module Transport = Exthost_Transport;
 
+module Command: {
+  [@deriving show]
+  type t = {
+    id: string,
+    title: option(string),
+  };
+
+  let decode: Json.decoder(t);
+};
+
 module CompletionContext: {
   type triggerKind =
     | Invoke
@@ -51,12 +61,176 @@ module CompletionKind: {
   let ofInt: int => option(t);
 };
 
+module OneBasedRange: {
+  type t = {
+    startLineNumber: int,
+    endLineNumber: int,
+    startColumn: int,
+    endColumn: int,
+  };
+
+  let ofRange: Range.t => t;
+  let toRange: t => Range.t;
+};
+
+module CodeLens: {
+  [@deriving show]
+  type t = {
+    cacheId: option(list(int)),
+    range: OneBasedRange.t,
+    command: option(Command.t),
+  };
+
+  let decode: Json.decoder(t);
+
+  module List: {let decode: Json.decoder(list(t));};
+};
+
+module Location: {
+  type t = {
+    uri: Uri.t,
+    range: OneBasedRange.t,
+  };
+
+  let decode: Json.decoder(t);
+};
+
+module MarkdownString: {
+  [@deriving show]
+  type t;
+
+  let fromString: string => t;
+  let toString: t => string;
+
+  let decode: Json.decoder(t);
+};
+
+module Edit: {
+  module SingleEditOperation: {
+    type t = {
+      range: OneBasedRange.t,
+      text: option(string),
+      forceMoveMarkers: bool,
+    };
+
+    let decode: Json.decoder(t);
+  };
+};
+
+module ExtensionActivationReason: {
+  type t;
+
+  let create:
+    (~startup: bool, ~extensionId: string, ~activationEvent: string) => t;
+
+  let encode: Json.encoder(t);
+};
+
+module ExtensionId: {
+  [@deriving show]
+  type t = string;
+
+  let decode: Json.decoder(t);
+};
+
+module DefinitionLink: {
+  [@deriving show]
+  type t = {
+    uri: Uri.t,
+    range: OneBasedRange.t,
+    originSelectionRange: option(OneBasedRange.t),
+    targetSelectionRange: option(OneBasedRange.t),
+  };
+
+  let decode: Json.decoder(t);
+};
+
 module DocumentFilter: {
   [@deriving show]
   type t = {
     language: option(string),
     scheme: option(string),
     exclusive: bool,
+  };
+
+  let matches: (~filetype: string, t) => bool;
+
+  let decode: Json.decoder(t);
+
+  let toString: t => string;
+};
+
+module DocumentSelector: {
+  [@deriving show]
+  type t = list(DocumentFilter.t);
+
+  let matches: (~filetype: string, t) => bool;
+
+  let matchesBuffer: (~buffer: Oni_Core.Buffer.t, t) => bool;
+
+  let decode: Json.decoder(t);
+};
+
+module DocumentHighlight: {
+  module Kind: {
+    [@deriving show]
+    type t =
+      | Text
+      | Read
+      | Write;
+
+    let ofInt: int => option(t);
+    let toInt: t => int;
+    let decode: Json.decoder(t);
+  };
+
+  [@deriving show]
+  type t = {
+    range: OneBasedRange.t,
+    kind: Kind.t,
+  };
+
+  let decode: Json.decoder(t);
+};
+
+module Hover: {
+  type t = {
+    contents: list(MarkdownString.t),
+    range: option(OneBasedRange.t),
+  };
+
+  let decode: Json.decoder(t);
+};
+
+module Message: {
+  [@deriving show]
+  type severity =
+    | Ignore
+    | Info
+    | Warning
+    | Error;
+
+  [@deriving show]
+  type handle;
+
+  let handleToJson: handle => Yojson.Safe.t;
+
+  module Command: {
+    [@deriving show]
+    type t = {
+      title: string,
+      isCloseAffordance: bool,
+      handle,
+    };
+
+    let decode: Json.decoder(t);
+  };
+};
+
+module RenameLocation: {
+  type t = {
+    range: OneBasedRange.t,
+    text: string,
   };
 
   let decode: Json.decoder(t);
@@ -76,10 +250,360 @@ module SuggestItem: {
   let decode: Json.decoder(t);
 };
 
+module ReferenceContext: {
+  type t = {includeDeclaration: bool};
+
+  let encode: Json.encoder(t);
+};
+
+module Label: {
+  [@deriving show]
+  type segment =
+    | Text(string)
+    | Icon(string);
+
+  [@deriving show]
+  type t = list(segment);
+
+  let ofString: string => t;
+  let toString: t => string;
+
+  let decode: Json.decoder(t);
+};
+
+module Progress: {
+  module Location: {
+    [@deriving show]
+    type t =
+      | Explorer
+      | SCM
+      | Extensions
+      | Window
+      | Notification
+      | Dialog
+      | Other(string);
+
+    let decode: Json.decoder(t);
+  };
+
+  module Options: {
+    [@deriving show]
+    type t = {
+      location: Location.t,
+      title: option(string),
+      source: option(string),
+      total: option(int),
+      cancellable: bool,
+      buttons: list(string),
+    };
+
+    let decode: Json.decoder(t);
+  };
+
+  module Step: {
+    [@deriving show]
+    type t = {
+      message: option(string),
+      increment: option(int),
+      total: option(int),
+    };
+
+    let decode: Json.decoder(t);
+  };
+};
+
+module InputBoxOptions: {
+  [@deriving show]
+  type t = {
+    ignoreFocusOut: bool,
+    password: bool,
+    placeHolder: option(string),
+    prompt: option(string),
+    value: option(string),
+    // TODO
+    // valueSelection: (int, int),
+  };
+};
+
+module QuickOpen: {
+  module Options: {
+    [@deriving show]
+    type t = {
+      placeholder: option(string),
+      matchOnDescription: bool,
+      matchOnDetail: bool,
+      matchOnLabel: bool, // default true
+      autoFocusOnList: bool, // default true
+      ignoreFocusLost: bool,
+      canPickMany: bool,
+      // TODO:
+      // https://github.com/onivim/vscode-exthost/blob/a25f426a04fe427beab7465be660f89a794605b5/src/vs/platform/quickinput/common/quickInput.ts#L78
+      //quickNavigate
+      contextKey: option(string),
+    };
+  };
+
+  module Button: {
+    [@deriving show]
+    type icon = {
+      dark: Oni_Core.Uri.t,
+      light: option(Oni_Core.Uri.t),
+    };
+
+    [@deriving show]
+    type t = {
+      iconPath: option(icon),
+      iconClass: option(string),
+      tooltip: option(string),
+    };
+  };
+
+  module Item: {
+    [@deriving show]
+    type t = {
+      // TransferQuickPickItems
+      handle: int,
+      // IQuickPickItem
+      id: option(string),
+      label: string,
+      description: option(string),
+      detail: option(string),
+      iconClasses: list(string),
+      buttons: list(Button.t),
+      picked: bool,
+      alwaysShow: bool,
+    };
+  };
+
+  module QuickPick: {
+    [@deriving show]
+    type t = {
+      // BaseTransferQuickInput
+      id: int,
+      enabled: bool,
+      busy: bool,
+      visible: bool,
+      // TransferQuickPick
+      value: option(string),
+      placeholder: option(string),
+      buttons: list(Button.t),
+      items: list(Item.t),
+      // TODO:
+      // activeItems
+      // selectedItems
+      // canSelectMany
+      // ignoreFocusOut
+      // matchOnDescription
+      // Match on Detail
+    };
+  };
+
+  module QuickInput: {
+    [@deriving show]
+    type t = {
+      // BaseTransferQuickInput
+      id: int,
+      enabled: bool,
+      busy: bool,
+      visible: bool,
+      // TransferInputBox
+      value: option(string),
+      placeholder: option(string),
+      buttons: list(Button.t),
+      prompt: option(string),
+      validationMessage: option(string),
+    };
+  };
+
+  [@deriving show]
+  type t =
+    | QuickPick(QuickPick.t)
+    | QuickInput(QuickInput.t);
+};
+
+module SCM: {
+  [@deriving show({with_path: false})]
+  type command = {
+    id: string,
+    title: string,
+    tooltip: option(string),
+    arguments: list([@opaque] Json.t),
+  };
+
+  module Resource: {
+    module Icons: {
+      [@deriving show({with_path: false})]
+      type t = {
+        light: Uri.t,
+        dark: Uri.t,
+      };
+    };
+
+    [@deriving show({with_path: false})]
+    type t = {
+      handle: int,
+      uri: Uri.t,
+      //      icons: Icons.t,
+      tooltip: string,
+      strikeThrough: bool,
+      faded: bool,
+    };
+
+    let decode: Json.decoder(t);
+
+    module Splice: {
+      type nonrec t = {
+        start: int,
+        deleteCount: int,
+        resources: list(t),
+      };
+    };
+
+    module Splices: {
+      [@deriving show({with_path: false})]
+      type t = {
+        handle: int,
+        resourceSplices: [@opaque] list(Splice.t),
+      };
+    };
+
+    module Decode: {let splices: Json.decoder(Splices.t);};
+  };
+
+  module GroupFeatures: {
+    [@deriving show({with_path: false})]
+    type t = {hideWhenEmpty: bool};
+
+    let decode: Json.decoder(t);
+  };
+
+  module Decode: {
+    //let resource: Yojson.Safe.t => Resource.t;
+    let command: Yojson.Safe.t => option(command);
+  };
+};
+
+module SignatureHelp: {
+  module ProviderMetadata: {
+    [@deriving show]
+    type t = {
+      triggerCharacters: list(string),
+      retriggerCharacters: list(string),
+    };
+
+    let decode: Json.decoder(t);
+  };
+
+  module TriggerKind: {
+    [@deriving show]
+    type t =
+      | Invoke
+      | TriggerCharacter
+      | ContentChange;
+  };
+
+  module RequestContext: {
+    [@deriving show]
+    type t = {
+      triggerKind: TriggerKind.t,
+      triggerCharacter: option(string),
+      isRetrigger: bool,
+      // TODO: Active signature help?
+      //activate
+    };
+
+    let encode: Json.encoder(t);
+  };
+
+  module ParameterInformation: {
+    [@deriving show]
+    type t = {
+      label: [ | `String(string) | `Range(int, int)],
+      documentation: option(MarkdownString.t),
+    };
+    let decode: Json.decoder(t);
+  };
+
+  module Signature: {
+    [@deriving show]
+    type t = {
+      label: string,
+      documentation: option(MarkdownString.t),
+      parameters: list(ParameterInformation.t),
+    };
+
+    let decode: Json.decoder(t);
+  };
+
+  module Response: {
+    type t = {
+      id: int,
+      signatures: list(Signature.t),
+      activeSignature: int,
+      activeParameter: int,
+    };
+
+    let decode: Json.decoder(t);
+  };
+};
+
 module SuggestResult: {
   type t = {
     completions: list(SuggestItem.t),
     isIncomplete: bool,
+  };
+
+  let empty: t;
+
+  let decode: Json.decoder(t);
+};
+
+module SymbolKind: {
+  [@deriving show]
+  type t =
+    | File
+    | Module
+    | Namespace
+    | Package
+    | Class
+    | Method
+    | Property
+    | Field
+    | Constructor
+    | Enum
+    | Interface
+    | Function
+    | Variable
+    | Constant
+    | String
+    | Number
+    | Boolean
+    | Array
+    | Object
+    | Key
+    | Null
+    | EnumMember
+    | Struct
+    | Event
+    | Operator
+    | TypeParameter;
+
+  let toInt: t => int;
+  let ofInt: int => option(t);
+  let decode: Json.decoder(t);
+};
+
+module DocumentSymbol: {
+  [@deriving show]
+  type t = {
+    name: string,
+    detail: string,
+    kind: SymbolKind.t,
+    // TODO: tags
+    containerName: option(string),
+    range: OneBasedRange.t,
+    selectionRange: OneBasedRange.t,
+    children: list(t),
   };
 
   let decode: Json.decoder(t);
@@ -109,6 +633,16 @@ module Configuration: {
     (~defaults: Model.t=?, ~user: Model.t=?, ~workspace: Model.t=?, unit) => t;
 };
 
+module Diagnostic: {
+  type t = {
+    range: OneBasedRange.t,
+    message: string,
+    severity: int,
+  };
+
+  let decode: Json.decoder(t);
+};
+
 module Eol: {
   type t =
     | LF
@@ -118,7 +652,120 @@ module Eol: {
 
   let toString: t => string;
 
-  let to_yojson: t => Yojson.Safe.t;
+  let encode: Json.encoder(t);
+};
+
+module FormattingOptions: {
+  type t = {
+    tabSize: int,
+    insertSpaces: bool,
+  };
+
+  let encode: Json.encoder(t);
+};
+
+module Files: {
+  module FileSystemProviderCapabilities: {
+    type capability = [
+      | `FileReadWrite
+      | `FileOpenReadWriteClose
+      | `FileReadStream
+      | `FileFolderCopy
+      | `PathCaseSensitive
+      | `Readonly
+      | `Trash
+    ];
+
+    [@deriving show]
+    type t;
+
+    let test: (capability, t) => bool;
+
+    let decode: Json.decoder(t);
+  };
+
+  module FileChangeType: {
+    [@deriving show]
+    type t =
+      | Updated
+      | Added
+      | Deleted;
+
+    let ofInt: int => option(t);
+    let toInt: t => int;
+
+    let decode: Json.decoder(t);
+  };
+
+  module FileChange: {
+    [@deriving show]
+    type t = {
+      resource: Uri.t,
+      changeType: FileChangeType.t,
+    };
+
+    let decode: Json.decoder(t);
+  };
+
+  module FileType: {
+    [@deriving show]
+    type t =
+      | Unknown
+      | File
+      | Directory
+      | SymbolicLink;
+
+    let ofInt: int => option(t);
+    let toInt: t => int;
+
+    let decode: Json.decoder(t);
+    let encode: Json.encoder(t);
+  };
+
+  module FileOverwriteOptions: {
+    [@deriving show]
+    type t = {overwrite: bool};
+
+    let decode: Json.decoder(t);
+  };
+
+  module FileWriteOptions: {
+    [@deriving show]
+    type t = {
+      overwrite: bool,
+      create: bool,
+    };
+
+    let decode: Json.decoder(t);
+  };
+  module FileOpenOptions: {
+    [@deriving show]
+    type t = {create: bool};
+
+    let decode: Json.decoder(t);
+  };
+  module FileDeleteOptions: {
+    [@deriving show]
+    type t = {
+      recursive: bool,
+      useTrash: bool,
+    };
+
+    let decode: Json.decoder(t);
+  };
+
+  module StatResult: {
+    [@deriving show]
+    type t = {
+      fileType: FileType.t,
+      mtime: int,
+      ctime: int,
+      size: int,
+    };
+
+    let decode: Json.decoder(t);
+    let encode: Json.encoder(t);
+  };
 };
 
 module ModelAddedDelta: {
@@ -142,7 +789,56 @@ module ModelAddedDelta: {
     ) =>
     t;
 
-  let to_yojson: t => Yojson.Safe.t;
+  let encode: Json.encoder(t);
+};
+
+module TextEditor: {
+  module CursorStyle: {
+    type t =
+      | Hidden // 0
+      | Blink // 1
+      | Smooth // 2
+      | Phase // 3
+      | Expand // 4
+      | Solid; // 5;
+
+    let encode: Json.encoder(t);
+  };
+
+  module LineNumbersStyle: {
+    type t =
+      | Off // 0
+      | On // 1
+      | Relative; // 2
+
+    let encode: Json.encoder(t);
+  };
+
+  module ResolvedConfiguration: {
+    type t = {
+      tabSize: int,
+      indentSize: int,
+      insertSpaces: int,
+      cursorStyle: CursorStyle.t,
+      lineNumbers: LineNumbersStyle.t,
+    };
+
+    let encode: Json.encoder(t);
+  };
+
+  module AddData: {
+    type t = {
+      id: string,
+      documentUri: Uri.t,
+      options: ResolvedConfiguration.t,
+      // TODO:
+      // selections: list(Selection.t),
+      // visibleRanges: list(Range.t),
+      // editorPosition: option(EditorViewColumn.t),
+    };
+
+    let encode: Json.encoder(t);
+  };
 };
 
 module DocumentsAndEditorsDelta: {
@@ -150,26 +846,32 @@ module DocumentsAndEditorsDelta: {
     removedDocuments: list(Uri.t),
     addedDocuments: list(ModelAddedDelta.t),
     removedEditors: list(string),
-    addedEditors: list(string),
+    addedEditors: list(TextEditor.AddData.t),
+    newActiveEditor: option(string),
   };
 
   let create:
     (
-      ~removedDocuments: list(Uri.t),
-      ~addedDocuments: list(ModelAddedDelta.t)
+      ~removedDocuments: list(Uri.t)=?,
+      ~addedDocuments: list(ModelAddedDelta.t)=?,
+      ~removedEditors: list(string)=?,
+      ~addedEditors: list(TextEditor.AddData.t)=?,
+      ~newActiveEditor: option(string)=?,
+      unit
     ) =>
     t;
 
-  let to_yojson: t => Yojson.Safe.t;
+  let encode: Json.encoder(t);
 };
 
 module OneBasedPosition: {
+  [@deriving show({with_path: false})]
   type t = {
     lineNumber: int,
     column: int,
   };
 
-  let ofPosition: Location.t => t;
+  let ofPosition: EditorCoreTypes.Location.t => t;
   let to_yojson: t => Yojson.Safe.t;
 };
 
@@ -192,18 +894,6 @@ module ModelChangedEvent: {
   };
 
   let to_yojson: t => Yojson.Safe.t;
-};
-
-module OneBasedRange: {
-  type t = {
-    startLineNumber: int,
-    endLineNumber: int,
-    startColumn: int,
-    endColumn: int,
-  };
-
-  let ofRange: Range.t => t;
-  let toRange: t => Range.t;
 };
 
 module ShellLaunchConfig: {
@@ -236,11 +926,52 @@ module WorkspaceData: {
     isUntitled: bool,
   };
 
+  let fromUri: (~name: string, ~id: string, Uri.t) => t;
+  let fromPath: string => t;
+
   let encode: Json.encoder(t);
   let decode: Json.decoder(t);
 };
 
+module ThemeColor: {
+  [@deriving show]
+  type t = {id: string};
+
+  let decode: Json.decoder(t);
+};
+
+module Color: {
+  [@deriving show]
+  type t;
+
+  let decode: Json.decoder(t);
+
+  let resolve: (Oni_Core.ColorTheme.Colors.t, t) => option(Revery.Color.t);
+};
+
+module WorkspaceEdit: {
+  module FileEdit: {type t;};
+
+  module TextEdit: {type t;};
+
+  type edit =
+    | File(FileEdit.t)
+    | Text(TextEdit.t);
+
+  type t = {
+    edits: list(edit),
+    rejectReason: option(string),
+  };
+};
+
 module Msg: {
+  module Clipboard: {
+    [@deriving show]
+    type msg =
+      | ReadText
+      | WriteText(string);
+  };
+
   module Commands: {
     [@deriving show]
     type msg =
@@ -252,6 +983,16 @@ module Msg: {
           retry: bool,
         })
       | GetCommands;
+  };
+
+  module Console: {
+    [@deriving show]
+    type msg =
+      | LogExtensionHostMessage({
+          logType: string,
+          severity: string,
+          arguments: Yojson.Safe.t,
+        });
   };
 
   module DebugService: {
@@ -300,16 +1041,31 @@ module Msg: {
         });
   };
 
+  module DownloadService: {
+    [@deriving show]
+    type msg =
+      | Download({
+          uri: Oni_Core.Uri.t,
+          dest: Oni_Core.Uri.t,
+        });
+  };
+
+  module Errors: {
+    [@deriving show]
+    type msg =
+      | OnUnexpectedError(Yojson.Safe.t);
+  };
+
   module ExtensionService: {
     [@deriving show]
     type msg =
       | ActivateExtension({
-          extensionId: string,
+          extensionId: ExtensionId.t,
           activationEvent: option(string),
         })
-      | WillActivateExtension({extensionId: string})
+      | WillActivateExtension({extensionId: ExtensionId.t})
       | DidActivateExtension({
-          extensionId: string,
+          extensionId: ExtensionId.t,
           //startup: bool,
           codeLoadingTime: int,
           activateCallTime: int,
@@ -317,38 +1073,236 @@ module Msg: {
         })
       //activationEvent: option(string),
       | ExtensionActivationError({
-          extensionId: string,
+          extensionId: ExtensionId.t,
           errorMessage: string,
         })
-      | ExtensionRuntimeError({extensionId: string});
+      | ExtensionRuntimeError({extensionId: ExtensionId.t});
+  };
+
+  module FileSystem: {
+    open Files;
+
+    [@deriving show]
+    type msg =
+      | RegisterFileSystemProvider({
+          handle: int,
+          scheme: string,
+          capabilities: FileSystemProviderCapabilities.t,
+        })
+      | UnregisterProvider({handle: int})
+      | OnFileSystemChange({
+          handle: int,
+          resource: list(FileChange.t),
+        })
+      | Stat({uri: Uri.t})
+      | ReadDir({uri: Uri.t})
+      | ReadFile({uri: Uri.t})
+      | WriteFile({
+          uri: Uri.t,
+          bytes: Bytes.t,
+        })
+      | Rename({
+          source: Uri.t,
+          target: Uri.t,
+          opts: FileOverwriteOptions.t,
+        })
+      | Copy({
+          source: Uri.t,
+          target: Uri.t,
+          opts: FileOverwriteOptions.t,
+        })
+      | Mkdir({uri: Uri.t})
+      | Delete({
+          uri: Uri.t,
+          opts: FileDeleteOptions.t,
+        });
   };
 
   module LanguageFeatures: {
     [@deriving show]
     type msg =
+      | EmitCodeLensEvent({
+          eventHandle: int,
+          event: Yojson.Safe.t,
+        }) // ??
+      | RegisterCodeLensSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+          eventHandle: option(int),
+        })
+      | RegisterDocumentHighlightProvider({
+          handle: int,
+          selector: DocumentSelector.t,
+        })
+      | RegisterDocumentSymbolProvider({
+          handle: int,
+          selector: DocumentSelector.t,
+          label: string,
+        })
+      | RegisterDefinitionSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+        })
+      | RegisterDeclarationSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+        })
+      | RegisterHoverProvider({
+          handle: int,
+          selector: DocumentSelector.t,
+        })
+      | RegisterImplementationSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+        })
+      | RegisterTypeDefinitionSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+        })
+      | RegisterSignatureHelpProvider({
+          handle: int,
+          selector: DocumentSelector.t,
+          metadata: SignatureHelp.ProviderMetadata.t,
+        })
       | RegisterSuggestSupport({
           handle: int,
-          selector: list(DocumentFilter.t),
+          selector: DocumentSelector.t,
           triggerCharacters: list(string),
           supportsResolveDetails: bool,
           extensionId: string,
+        })
+      | RegisterReferenceSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+        })
+      | RegisterRenameSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+          supportsResolveInitialValues: bool,
+        })
+      | RegisterDocumentFormattingSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+          extensionId: ExtensionId.t,
+          displayName: string,
+        })
+      | RegisterRangeFormattingSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+          extensionId: ExtensionId.t,
+          displayName: string,
+        })
+      | RegisterOnTypeFormattingSupport({
+          handle: int,
+          selector: DocumentSelector.t,
+          autoFormatTriggerCharacters: list(string),
+          extensionId: ExtensionId.t,
         })
       | Unregister({handle: int});
   };
 
   module MessageService: {
-    type severity =
-      | Ignore
-      | Info
-      | Warning
-      | Error;
-
     [@deriving show]
     type msg =
       | ShowMessage({
-          severity,
+          severity: Message.severity,
           message: string,
           extensionId: option(string),
+          commands: list(Message.Command.t),
+        });
+  };
+
+  module Progress: {
+    [@deriving show]
+    type msg =
+      | StartProgress({
+          handle: int,
+          options: Progress.Options.t,
+        })
+      | ProgressReport({
+          handle: int,
+          message: Progress.Step.t,
+        })
+      | ProgressEnd({handle: int});
+  };
+
+  module QuickOpen: {
+    [@deriving show]
+    type msg =
+      // TODO: How to handle incoming cancellation token?
+      | Show({
+          instance: int,
+          options: QuickOpen.Options.t,
+        }) // Returns a promise / id
+      | SetItems({
+          instance: int,
+          items: list(QuickOpen.Item.t),
+        })
+      | SetError({
+          instance: int,
+          error: Yojson.Safe.t,
+        })
+      | Input({
+          options: InputBoxOptions.t,
+          validateInput: bool,
+        })
+      | CreateOrUpdate({params: QuickOpen.t})
+      | Dispose({id: int});
+  };
+
+  module SCM: {
+    [@deriving show]
+    type msg =
+      | RegisterSourceControl({
+          handle: int,
+          id: string,
+          label: string,
+          rootUri: option(Uri.t),
+        })
+      | UnregisterSourceControl({handle: int})
+      | UpdateSourceControl({
+          handle: int,
+          hasQuickDiffProvider: option(bool),
+          count: option(int),
+          commitTemplate: option(string),
+          acceptInputCommand: option(SCM.command),
+        })
+      // statusBarCommands: option(_),
+      | RegisterSCMResourceGroup({
+          provider: int,
+          handle: int,
+          id: string,
+          label: string,
+        })
+      | UnregisterSCMResourceGroup({
+          provider: int,
+          handle: int,
+        })
+      | UpdateGroup({
+          provider: int,
+          handle: int,
+          features: SCM.GroupFeatures.t,
+        })
+      | UpdateGroupLabel({
+          provider: int,
+          handle: int,
+          label: string,
+        })
+      | SetInputBoxPlaceholder({
+          handle: int,
+          value: string,
+        })
+      | SetInputBoxVisibility({
+          handle: int,
+          visible: bool,
+        })
+      | SetValidationProviderIsEnabled({
+          handle: int,
+          enabled: bool,
+        })
+      | SpliceSCMResourceStates({
+          handle: int,
+          splices: list(SCM.Resource.Splices.t),
         });
   };
 
@@ -376,14 +1330,40 @@ module Msg: {
           terminalId: int,
           data: string,
         })
-      | SendProcessPid({
+      | SendProcessReady({
           terminalId: int,
           pid: int,
+          workingDirectory: string,
         })
       | SendProcessExit({
           terminalId: int,
           exitCode: int,
         });
+  };
+
+  module OutputService: {
+    [@deriving show]
+    type msg =
+      | Register({
+          label: string,
+          log: bool,
+          file: option(Oni_Core.Uri.t),
+        })
+      | Append({
+          channelId: string,
+          value: string,
+        })
+      | Update({channelId: string})
+      | Clear({
+          channelId: string,
+          till: int,
+        })
+      | Reveal({
+          channelId: string,
+          preserveFocus: bool,
+        })
+      | Close({channelId: string})
+      | Dispose({channelId: string});
   };
 
   module StatusBar: {
@@ -396,28 +1376,49 @@ module Msg: {
     type msg =
       | SetEntry({
           id: string,
-          text: string,
+          label: Label.t,
           source: string,
           alignment,
+          command: option(Command.t),
+          color: option(Color.t),
+          tooltip: option(string),
           priority: int,
-        });
+        })
+      | Dispose({id: int});
+  };
+
+  module Window: {
+    [@deriving show]
+    type msg =
+      | GetWindowVisibility
+      | OpenUri({uri: Oni_Core.Uri.t});
   };
 
   [@deriving show]
   type t =
     | Connected
     | Ready
+    | Clipboard(Clipboard.msg)
     | Commands(Commands.msg)
+    | Console(Console.msg)
     | DebugService(DebugService.msg)
     | Decorations(Decorations.msg)
     | Diagnostics(Diagnostics.msg)
     | DocumentContentProvider(DocumentContentProvider.msg)
+    | DownloadService(DownloadService.msg)
+    | Errors(Errors.msg)
     | ExtensionService(ExtensionService.msg)
+    | FileSystem(FileSystem.msg)
     | LanguageFeatures(LanguageFeatures.msg)
     | MessageService(MessageService.msg)
+    | OutputService(OutputService.msg)
+    | Progress(Progress.msg)
+    | QuickOpen(QuickOpen.msg)
+    | SCM(SCM.msg)
     | StatusBar(StatusBar.msg)
     | Telemetry(Telemetry.msg)
     | TerminalService(TerminalService.msg)
+    | Window(Window.msg)
     | Initialized
     | Disconnected
     | Unhandled
@@ -434,18 +1435,39 @@ module NamedPipe: {
   let toString: t => string;
 };
 
-module Client: {
+module Reply: {
   type t;
 
-  // TODO
-  type reply = unit;
+  let none: t;
+
+  let error: string => t;
+
+  let okEmpty: t;
+
+  let okJson: Yojson.Safe.t => t;
+
+  let okBuffer: Bytes.t => t;
+};
+
+module Middleware: {
+  let download: Msg.DownloadService.msg => Lwt.t(Reply.t);
+  let filesystem: Msg.FileSystem.msg => Lwt.t(Reply.t);
+};
+
+module Client: {
+  type t;
 
   let start:
     (
       ~initialConfiguration: Configuration.t=?,
+      ~initialWorkspace: WorkspaceData.t=?,
       ~namedPipe: NamedPipe.t,
       ~initData: Extension.InitData.t,
-      ~handler: Msg.t => option(reply),
+      // TODO:
+      // Is there a way to use GADT's to strongly-type the reply from the request?
+      // Right now, we take arbitrary JSON responses, without help from the type
+      // system that these are correct.
+      ~handler: Msg.t => Lwt.t(Reply.t),
       ~onError: string => unit,
       unit
     ) =>
@@ -462,6 +1484,37 @@ module Request: {
   module Commands: {
     let executeContributedCommand:
       (~arguments: list(Json.t), ~command: string, Client.t) => unit;
+  };
+
+  module Configuration: {
+    let acceptConfigurationChanged:
+      (
+        ~configuration: Configuration.t,
+        ~changed: Configuration.Model.t,
+        Client.t
+      ) =>
+      unit;
+  };
+
+  module Decorations: {
+    type request = {
+      id: int,
+      handle: int,
+      uri: Uri.t,
+    };
+
+    type decoration = {
+      priority: int,
+      bubble: bool,
+      title: string,
+      letter: string,
+      color: ThemeColor.t,
+    };
+
+    type reply = IntMap.t(decoration);
+
+    let provideDecorations:
+      (~requests: list(request), Client.t) => Lwt.t(reply);
   };
 
   module DocumentContentProvider: {
@@ -495,9 +1548,25 @@ module Request: {
 
   module ExtensionService: {
     let activateByEvent: (~event: string, Client.t) => unit;
+
+    let activate:
+      (~extensionId: string, ~reason: ExtensionActivationReason.t, Client.t) =>
+      Lwt.t(bool);
+
+    let deltaExtensions:
+      (
+        ~toAdd: list(Exthost_Extension.InitData.Extension.t),
+        ~toRemove: list(ExtensionId.t),
+        Client.t
+      ) =>
+      Lwt.t(unit);
   };
 
   module LanguageFeatures: {
+    let provideCodeLenses:
+      (~handle: int, ~resource: Uri.t, Client.t) =>
+      Lwt.t(option(list(CodeLens.t)));
+
     let provideCompletionItems:
       (
         ~handle: int,
@@ -507,6 +1576,143 @@ module Request: {
         Client.t
       ) =>
       Lwt.t(SuggestResult.t);
+
+    let provideDocumentHighlights:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        Client.t
+      ) =>
+      Lwt.t(list(DocumentHighlight.t));
+
+    let provideDocumentSymbols:
+      (~handle: int, ~resource: Uri.t, Client.t) =>
+      Lwt.t(list(DocumentSymbol.t));
+
+    let provideDefinition:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        Client.t
+      ) =>
+      Lwt.t(list(DefinitionLink.t));
+
+    let provideDeclaration:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        Client.t
+      ) =>
+      Lwt.t(list(DefinitionLink.t));
+
+    let provideHover:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        Client.t
+      ) =>
+      Lwt.t(option(Hover.t));
+
+    let provideImplementation:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        Client.t
+      ) =>
+      Lwt.t(list(DefinitionLink.t));
+
+    let provideReferences:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        ~context: ReferenceContext.t,
+        Client.t
+      ) =>
+      Lwt.t(list(Location.t));
+
+    let provideRenameEdits:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        ~newName: string,
+        Client.t
+      ) =>
+      Lwt.t(option(WorkspaceEdit.t));
+
+    let resolveRenameLocation:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        Client.t
+      ) =>
+      Lwt.t(option(RenameLocation.t));
+
+    let provideTypeDefinition:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        Client.t
+      ) =>
+      Lwt.t(list(DefinitionLink.t));
+
+    let provideSignatureHelp:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        ~context: SignatureHelp.RequestContext.t,
+        Client.t
+      ) =>
+      Lwt.t(option(SignatureHelp.Response.t));
+
+    let provideDocumentFormattingEdits:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~options: FormattingOptions.t,
+        Client.t
+      ) =>
+      Lwt.t(option(list(Edit.SingleEditOperation.t)));
+
+    let provideDocumentRangeFormattingEdits:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~range: OneBasedRange.t,
+        ~options: FormattingOptions.t,
+        Client.t
+      ) =>
+      Lwt.t(option(list(Edit.SingleEditOperation.t)));
+
+    let provideOnTypeFormattingEdits:
+      (
+        ~handle: int,
+        ~resource: Uri.t,
+        ~position: OneBasedPosition.t,
+        ~character: string,
+        ~options: FormattingOptions.t,
+        Client.t
+      ) =>
+      Lwt.t(option(list(Edit.SingleEditOperation.t)));
+
+    let releaseSignatureHelp: (~handle: int, ~id: int, Client.t) => unit;
+  };
+
+  module SCM: {
+    let provideOriginalResource:
+      (~handle: int, ~uri: Uri.t, Client.t) => Lwt.t(option(Uri.t));
+
+    let onInputBoxValueChange:
+      (~handle: int, ~value: string, Client.t) => unit;
   };
 
   module TerminalService: {
@@ -535,3 +1741,6 @@ module Request: {
       (~workspace: option(WorkspaceData.t), Client.t) => unit;
   };
 };
+
+module GrammarInfo = GrammarInfo;
+module LanguageInfo = LanguageInfo;

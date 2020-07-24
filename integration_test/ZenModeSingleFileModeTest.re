@@ -1,4 +1,3 @@
-open Oni_Core;
 open Oni_Model;
 open Oni_IntegrationTestLib;
 
@@ -8,21 +7,14 @@ let configuration = {|
 { "editor.zenMode.singleFile": true }
 |};
 
-let cliOptions =
-  Cli.create(
-    ~folder=Revery.Environment.getWorkingDirectory(),
-    // Specify a single file
-    ~filesToOpen=["some-random-file.txt"],
-    (),
-  );
-
 runTest(
   ~configuration=Some(configuration),
-  ~cliOptions=Some(cliOptions),
+  ~filesToOpen=["some-random-file.txt"],
   ~name="ZenMode: Single-file mode works as expected",
   (_dispatch, wait, _runEffects) => {
     wait(~name="Wait for split to be created 1", (state: State.t) => {
-      let splitCount = state.layout |> Feature_Layout.windows |> List.length;
+      let splitCount =
+        state.layout |> Feature_Layout.visibleEditors |> List.length;
       splitCount == 1;
     });
 

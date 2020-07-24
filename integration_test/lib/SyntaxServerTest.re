@@ -1,7 +1,7 @@
 open Oni_Core;
 open Oni_Core.Utility;
-open Oni_Extensions;
 open Timber;
+open Exthost;
 
 type testContext = {
   syntaxClient: Oni_Syntax_Client.t,
@@ -58,9 +58,9 @@ let run = (~parentPid=?, ~name, f) => {
         Revery.Environment.executingDirectory ++ "SyntaxServer.exe",
       ~onConnected,
       ~onClose,
-      ~onHighlights=_ => (),
+      ~onHighlights=(~bufferId as _, ~tokens as _) => (),
       ~onHealthCheckResult=_ => (),
-      LanguageInfo.initial,
+      GrammarInfo.initial,
       Setup.default(),
     )
     |> Result.get_ok;

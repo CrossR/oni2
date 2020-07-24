@@ -35,11 +35,14 @@ type quickSuggestionsEnabled = {
   strings: bool,
 };
 
+type fontLigatures = [ | `Bool(bool) | `List(list(string))];
+
 type t = {
   editorAutoClosingBrackets: autoClosingBrackets,
   editorDetectIndentation: bool,
-  editorFontFamily: string,
+  editorFontFile: string,
   editorFontSize: float,
+  editorFontLigatures: fontLigatures,
   editorFontSmoothing: fontSmoothing,
   editorHoverDelay: int,
   editorHoverEnabled: bool,
@@ -58,9 +61,7 @@ type t = {
   editorRenderIndentGuides: bool,
   editorRenderWhitespace,
   editorRulers: list(int),
-  syntaxEagerMaxLines: int,
-  syntaxEagerMaxLineLength: int,
-  terminalIntegratedFontFamily: string,
+  terminalIntegratedFontFile: string,
   terminalIntegratedFontSize: float,
   terminalIntegratedFontSmoothing: fontSmoothing,
   workbenchActivityBarVisible: bool,
@@ -83,16 +84,16 @@ type t = {
   // These are 'use-at-your-own-risk' features
   // Turn on tree-sitter for supported filetypes:
   // - JSON
-  experimentalTreeSitter: bool,
   experimentalVimL: list(string),
 };
 
 let default = {
   editorAutoClosingBrackets: LanguageDefined,
   editorDetectIndentation: true,
-  editorFontFamily: Constants.defaultFontFamily,
+  editorFontFile: Constants.defaultFontFile,
   editorFontSmoothing: Default,
   editorFontSize: Constants.defaultFontSize,
+  editorFontLigatures: `Bool(true),
   editorHoverDelay: 1000,
   editorHoverEnabled: true,
   editorLargeFileOptimizations: true,
@@ -102,7 +103,7 @@ let default = {
   editorMinimapShowSlider: true,
   editorMinimapMaxColumn: Constants.minimapMaxColumn,
   editorLineNumbers: On,
-  editorInsertSpaces: false,
+  editorInsertSpaces: true,
   editorIndentSize: 4,
   editorTabSize: 4,
   editorRenderIndentGuides: true,
@@ -112,15 +113,13 @@ let default = {
     comments: true,
     strings: true,
   },
-  editorRenderWhitespace: All,
+  editorRenderWhitespace: None,
   editorRulers: [],
-  syntaxEagerMaxLines: Constants.syntaxEagerMaxLines,
-  syntaxEagerMaxLineLength: Constants.syntaxEagerMaxLineLength,
-  terminalIntegratedFontFamily: Constants.defaultFontFamily,
+  terminalIntegratedFontFile: Constants.defaultFontFile,
   terminalIntegratedFontSize: Constants.defaultTerminalFontSize,
   terminalIntegratedFontSmoothing: Default,
   workbenchActivityBarVisible: true,
-  workbenchColorTheme: "One Dark Pro",
+  workbenchColorTheme: "LaserWave Italic",
   workbenchEditorShowTabs: true,
   workbenchSideBarVisible: true,
   workbenchStatusBarVisible: true,
@@ -138,7 +137,5 @@ let default = {
   windowTitle: "${dirty}${activeEditorShort}${separator}${rootName}${separator}${appName}",
   zenModeHideTabs: true,
   zenModeSingleFile: true,
-
-  experimentalTreeSitter: false,
   experimentalVimL: [],
 };

@@ -8,9 +8,7 @@ open EditorCoreTypes;
 open Oni_Core;
 open Oni_Input;
 open Oni_Syntax;
-open Oni_Components;
 
-module Ext = Oni_Extensions;
 module ContextMenu = Oni_Components.ContextMenu;
 module CompletionMeet = Feature_LanguageSupport.CompletionMeet;
 module CompletionItem = Feature_LanguageSupport.CompletionItem;
@@ -24,14 +22,28 @@ type t =
   | BufferHighlights(BufferHighlights.action)
   | BufferDisableSyntaxHighlighting(int)
   | BufferEnter({
-      metadata: [@opaque] Vim.BufferMetadata.t,
+      id: int,
       fileType: option(string),
       lineEndings: [@opaque] option(Vim.lineEnding),
+      filePath: option(string),
+      isModified: bool,
+      version: int,
+      // TODO: This duplication-of-truth is really awkward,
+      // but I want to remove it shortly
+      buffer: [@opaque] Buffer.t,
+    })
+  | BufferFilenameChanged({
+      id: int,
+      newFilePath: option(string),
+      newFileType: option(string),
+      version: int,
+      isModified: bool,
     })
   | BufferUpdate({
       update: [@opaque] BufferUpdate.t,
       oldBuffer: [@opaque] Buffer.t,
       newBuffer: [@opaque] Buffer.t,
+      triggerKey: option(string),
     })
   | BufferLineEndingsChanged({
       id: int,
@@ -41,7 +53,11 @@ type t =
   | BufferSaved(int)
   | BufferSetIndentation(int, [@opaque] IndentationSettings.t)
   | BufferSetModified(int, bool)
+  | Clipboard(Feature_Clipboard.msg)
   | Syntax(Feature_Syntax.msg)
+  | Hover(Feature_Hover.msg)
+  | SignatureHelp(Feature_SignatureHelp.msg)
+  | Changelog(Feature_Changelog.msg)
   | Command(string)
   | Commands(Feature_Commands.msg(t))
   | CompletionAddItems(
@@ -55,14 +71,10 @@ type t =
   // ConfigurationTransform(fileName, f) where [f] is a configurationTransformer
   // opens the file [fileName] and applies [f] to the loaded JSON.
   | ConfigurationTransform(string, configurationTransformer)
-  | DefinitionAvailable(
-      int,
-      Location.t,
-      [@opaque] LanguageFeatures.DefinitionResult.t,
-    )
   | EditorFont(Service_Font.msg)
   | TerminalFont(Service_Font.msg)
-  | Extension(Extensions.action)
+  | Extensions(Feature_Extensions.msg)
+  | ExtensionBufferUpdateQueued({triggerKey: option(string)})
   | FileChanged(Service_FileWatcher.event)
   | References(References.actions)
   | KeyBindingsSet([@opaque] Keybindings.t)
@@ -73,50 +85,46 @@ type t =
   | KeyDown([@opaque] EditorInput.KeyPress.t, [@opaque] Revery.Time.t)
   | KeyUp([@opaque] EditorInput.KeyPress.t, [@opaque] Revery.Time.t)
   | TextInput([@opaque] string, [@opaque] Revery.Time.t)
-  | HoverShow
-  | ModeChanged([@opaque] Vim.Mode.t)
   | ContextMenuOverlayClicked
-  | ContextMenuItemSelected(ContextMenu.item(t))
   | DiagnosticsHotKey
   | DiagnosticsSet(Uri.t, string, [@opaque] list(Diagnostic.t))
   | DiagnosticsClear(string)
-  | SelectionChanged([@opaque] VisualRange.t)
-  | RecalculateEditorView([@opaque] option(Buffer.t))
   | DisableKeyDisplayer
   | EnableKeyDisplayer
   | KeyboardInput(string)
   | WindowTitleSet(string)
-  | EditorGroupSelected(int)
-  | EditorGroupAdd(EditorGroup.t)
   | EditorGroupSizeChanged({
       id: int,
       width: int,
       height: int,
     })
-  | EditorCursorMove(Feature_Editor.EditorId.t, [@opaque] list(Vim.Cursor.t))
-  | EditorSetScroll(Feature_Editor.EditorId.t, float)
   | EditorSizeChanged({
       id: Feature_Editor.EditorId.t,
       pixelWidth: int,
       pixelHeight: int,
     })
-  | EditorScroll(Feature_Editor.EditorId.t, float)
-  | EditorScrollToLine(Feature_Editor.EditorId.t, int)
-  | EditorScrollToColumn(Feature_Editor.EditorId.t, int)
+  | Formatting(Feature_Formatting.msg)
   | Notification(Feature_Notification.msg)
-  | ExtMessageReceived({
-      severity: [ | `Ignore | `Info | `Warning | `Error],
-      message: string,
-      extensionId: option(string),
+  | Messages(Feature_Messages.msg)
+  | Editor({
+      scope: EditorScope.t,
+      msg: Feature_Editor.msg,
     })
+  | FilesDropped({paths: list(string)})
   | FileExplorer(FileExplorer.action)
   | LanguageFeature(LanguageFeatures.action)
+  | LanguageSupport(Feature_LanguageSupport.msg)
+  | QuickmenuPaste(string)
   | QuickmenuShow(quickmenuVariant)
   | QuickmenuInput(string)
-  | QuickmenuInputClicked(Selection.t)
+  | QuickmenuInputMessage(Feature_InputText.msg)
   | QuickmenuCommandlineUpdated(string, int)
   | QuickmenuUpdateRipgrepProgress(progress)
   | QuickmenuUpdateFilterProgress([@opaque] array(menuItem), progress)
+  | QuickmenuUpdateExtensionItems({
+      id: int,
+      items: list(Exthost.QuickOpen.Item.t),
+    })
   | QuickmenuSearch(string)
   | QuickmenuClose
   | ListFocus(int)
@@ -129,31 +137,33 @@ type t =
       option([ | `Horizontal | `Vertical]),
       option(Location.t),
     )
-  | AddSplit([ | `Horizontal | `Vertical], int)
-  | RemoveSplit(int)
+  | OpenFileInNewLayout(string)
+  | BufferOpened(string, option(Location.t), int)
+  | BufferOpenedForLayout(int)
   | OpenConfigFile(string)
+  | Pasted({
+      rawText: string,
+      isMultiLine: bool,
+      lines: array(string),
+    })
+  | Registers(Feature_Registers.msg)
   | QuitBuffer([@opaque] Vim.Buffer.t, bool)
   | Quit(bool)
   // ReallyQuitting is dispatched when we've decided _for sure_
   // to quit the app. This gives subscriptions the chance to clean up.
   | ReallyQuitting
   | RegisterQuitCleanup(unit => unit)
-  | SearchClearMatchingPair(int)
-  | SearchSetMatchingPair(int, Location.t, Location.t)
   | SearchSetHighlights(int, list(Range.t))
   | SearchClearHighlights(int)
-  | SetLanguageInfo([@opaque] Ext.LanguageInfo.t)
+  | SetLanguageInfo([@opaque] Exthost.LanguageInfo.t)
+  | SetGrammarRepository([@opaque] Oni_Syntax.GrammarRepository.t)
   | ThemeLoadByPath(string, string)
   | ThemeLoadByName(string)
   | ThemeChanged(string)
   | SetIconTheme([@opaque] IconTheme.t)
-  | StatusBarAddItem([@opaque] StatusBarModel.Item.t)
-  | StatusBarDisposeItem(int)
-  | StatusBar(StatusBarModel.action)
+  | StatusBar(Feature_StatusBar.msg)
   | TokenThemeLoaded([@opaque] TokenTheme.t)
   | ThemeLoadError(string)
-  | ViewCloseEditor(int)
-  | ViewSetActiveEditor(int)
   | EnableZenMode
   | DisableZenMode
   | CopyActiveFilepathToClipboard
@@ -161,12 +171,15 @@ type t =
   | SearchStart
   | SearchHotkey
   | Search(Feature_Search.msg)
-  | Sneak(Sneak.action)
+  | SideBar(Feature_SideBar.msg)
+  | Sneak(Feature_Sneak.msg)
   | Terminal(Feature_Terminal.msg)
   | Theme(Feature_Theme.msg)
-  | PaneTabClicked(Pane.pane)
+  | Pane(Feature_Pane.msg)
+  | PaneTabClicked(Feature_Pane.pane)
   | PaneCloseButtonClicked
-  | VimDirectoryChanged(string)
+  | DirectoryChanged(string)
+  | VimExecuteCommand(string)
   | VimMessageReceived({
       priority: [@opaque] Vim.Types.msgPriority,
       title: string,
@@ -175,9 +188,12 @@ type t =
   | WindowFocusGained
   | WindowFocusLost
   | WindowMaximized
+  | WindowFullscreen
   | WindowMinimized
   | WindowRestored
+  | TitleBar(Feature_TitleBar.msg)
   | WindowCloseBlocked
+  | Layout(Feature_Layout.msg)
   | WriteFailure
   | NewTextContentProvider({
       handle: int,
@@ -187,7 +203,6 @@ type t =
   | Modals(Feature_Modals.msg)
   // "Internal" effect action, see TitleStoreConnector
   | SetTitle(string)
-  | TitleDoubleClicked
   | GotOriginalUri({
       bufferId: int,
       uri: Uri.t,
@@ -210,6 +225,8 @@ type t =
       uri: Uri.t,
       decorations: list(Decoration.t),
     })
+  | Vim(Feature_Vim.msg)
+  | TabPage(Vim.TabPage.effect)
   | Noop
 and command = {
   commandCategory: option(string),
@@ -230,14 +247,20 @@ and menuItem = {
   command: unit => t,
   icon: [@opaque] option(IconTheme.IconDefinition.t),
   highlight: list((int, int)),
+  handle: option(int),
 }
 and quickmenuVariant =
   | CommandPalette
   | EditorsPicker
   | FilesPicker
   | Wildmenu([@opaque] Vim.Types.cmdlineType)
-  | ThemesPicker
+  | ThemesPicker([@opaque] list(Feature_Theme.theme))
   | DocumentSymbols
+  | Extension({
+      id: int,
+      hasItems: bool,
+      resolver: [@opaque] Lwt.u(int),
+    })
 and progress =
   | Loading
   | InProgress(float)

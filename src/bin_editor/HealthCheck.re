@@ -81,13 +81,25 @@ let mainChecks = [
   (
     "Verify node dependencies",
     (setup: Setup.t) => {
-      Oni_Extensions.NodeTask.run(~setup, "check-health.js")
+      NodeTask.run(~setup, "check-health.js")
       |> LwtEx.sync
       |> (
         fun
         | Ok(_) => true
         | Error(_) => false
       );
+    },
+  ),
+  (
+    "Verify simple request",
+    (setup: Setup.t) => {
+      Service_Net.Request.json(
+        ~setup,
+        ~decoder=Json.Decode.value,
+        "https://httpbin.org/json",
+      )
+      |> LwtEx.sync
+      |> Result.is_ok;
     },
   ),
   (
@@ -102,15 +114,17 @@ let mainChecks = [
     "Verify bundled font exists",
     _ =>
       Sys.file_exists(
-        Revery.Environment.executingDirectory ++ "FiraCode-Regular.ttf",
+        Revery.Environment.executingDirectory ++ "JetBrainsMono-Regular.ttf",
       ),
   ),
   (
     "Revery: Verify can measure & shape font",
     _ => {
       let fontPath =
-        Revery.Environment.executingDirectory ++ "FiraCode-Regular.ttf";
-      switch (Revery.Font.load(fontPath)) {
+        Revery.Environment.executingDirectory ++ "JetBrainsMono-Regular.ttf";
+      let family = Revery.Font.Family.fromFile(fontPath);
+      let maybeSkia = Revery.Font.Family.toSkia(Normal, family);
+      switch (Revery.Font.load(maybeSkia)) {
       | Ok(font) =>
         let metrics = Revery.Font.getMetrics(font, 12.0);
         ignore(metrics);
@@ -177,9 +191,9 @@ let mainChecks = [
         Oni_Syntax_Client.start(
           ~onConnected=() => {connected := true},
           ~onClose=_ => {closed := true},
-          ~onHighlights=_ => (),
+          ~onHighlights=(~bufferId as _, ~tokens as _) => (),
           ~onHealthCheckResult=res => {healthCheckResult := res},
-          Oni_Extensions.LanguageInfo.initial,
+          Exthost.GrammarInfo.initial,
           setup,
         )
         |> Result.get_ok;
@@ -249,6 +263,22 @@ let run = (~checks, _cli) => {
   };
 
   Log.info("");
+
+  let printCrashLog = () => {
+    Log.info("Checking for crash log...");
+
+    if (File.exists("onivim2-crash.log")) {
+      Log.error("Crash log found:");
+      Log.error("---");
+      let lines = File.readAllLines("onivim2-crash.log");
+      lines |> List.iter(Log.error);
+      Log.error("---");
+    } else {
+      Log.info("No crash log found!");
+    };
+  };
+
+  printCrashLog();
 
   Log.info("All systems go.");
   Log.info("Checking for remaining threads...");

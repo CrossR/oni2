@@ -7,12 +7,8 @@
 open EditorCoreTypes;
 open Oni_Core;
 open Oni_Model;
-open Utility;
 open Actions;
 open Oni_Syntax;
-
-module Utility = Utility;
-module Ext = Oni_Extensions;
 
 module DefinitionResult = LanguageFeatures.DefinitionResult;
 module Editor = Feature_Editor.Editor;
@@ -24,13 +20,6 @@ let start = () => {
     Isolinear.Effect.createWithDispatch(
       ~name="languageFeature.checkForDefinition", dispatch => {
       Log.debug("Checking for definition...");
-
-      let getDefinitionPromise =
-        LanguageFeatures.requestDefinition(
-          ~buffer,
-          ~location,
-          languageFeatures,
-        );
 
       let getHighlightsPromise =
         LanguageFeatures.requestDocumentHighlights(
@@ -54,23 +43,18 @@ let start = () => {
           BufferHighlights(BufferHighlights.DocumentHighlightsCleared(id)),
         )
       });
-
-      Lwt.on_success(getDefinitionPromise, result =>
-        dispatch(DefinitionAvailable(id, location, result))
-      );
     });
 
-  let findAllReferences = state =>
+  let findAllReferences = (state: State.t) =>
     Isolinear.Effect.createWithDispatch(
       ~name="languageFeature.findAllReferences", dispatch => {
       let maybeBuffer = state |> Selectors.getActiveBuffer;
 
-      let maybeEditor =
-        state |> Selectors.getActiveEditorGroup |> Selectors.getActiveEditor;
+      let editor = Feature_Layout.activeEditor(state.layout);
 
-      OptionEx.iter2(
-        (buffer, editor) => {
-          let location = Editor.getPrimaryCursor(~buffer, editor);
+      Option.iter(
+        buffer => {
+          let location = Editor.getPrimaryCursor(editor);
           let promise =
             LanguageFeatures.requestFindAllReferences(
               ~buffer,
@@ -83,7 +67,6 @@ let start = () => {
           });
         },
         maybeBuffer,
-        maybeEditor,
       );
     });
 
@@ -97,7 +80,8 @@ let start = () => {
         Isolinear.Effect.none,
       )
 
-    | EditorCursorMove(_, cursors) when state.vimMode != Vim.Types.Insert =>
+    | Editor({msg: CursorsChanged(cursors), _})
+        when Feature_Vim.mode(state.vim) != Vim.Types.Insert =>
       switch (Selectors.getActiveBuffer(state)) {
       | None => (state, Isolinear.Effect.none)
       | Some(buf) =>

@@ -64,7 +64,11 @@ let ext = name => {
 let handlers =
   [
     mainNotImplemented("MainThreadAuthentication"),
-    mainNotImplemented("MainThreadClipboard"),
+    main(
+      ~handler=Msg.Clipboard.handle,
+      ~mapper=msg => Msg.Clipboard(msg),
+      "MainThreadClipboard",
+    ),
     main(
       ~handler=Msg.Commands.handle,
       ~mapper=msg => Msg.Commands(msg),
@@ -72,7 +76,11 @@ let handlers =
     ),
     mainNotImplemented("MainThreadComments"),
     mainNotImplemented("MainThreadConfiguration"),
-    mainNotImplemented("MainThreadConsole"),
+    main(
+      ~handler=Msg.Console.handle,
+      ~mapper=msg => Msg.Console(msg),
+      "MainThreadConsole",
+    ),
     main(
       ~handler=Msg.DebugService.handle,
       ~mapper=msg => Msg.DebugService(msg),
@@ -97,9 +105,17 @@ let handlers =
     ),
     mainNotImplemented("MainThreadTextEditors"),
     mainNotImplemented("MainThreadEditorInsets"),
-    mainNotImplemented("MainThreadErrors"),
+    main(
+      ~handler=Msg.Errors.handle,
+      ~mapper=msg => Msg.Errors(msg),
+      "MainThreadErrors",
+    ),
     mainNotImplemented("MainThreadTreeViews"),
-    mainNotImplemented("MainThreadDownloadService"),
+    main(
+      ~handler=Msg.DownloadService.handle,
+      ~mapper=msg => Msg.DownloadService(msg),
+      "MainThreadDownloadService",
+    ),
     mainNotImplemented("MainThreadKeytar"),
     main(
       ~handler=Msg.LanguageFeatures.handle,
@@ -113,9 +129,21 @@ let handlers =
       ~mapper=msg => Msg.MessageService(msg),
       "MainThreadMessageService",
     ),
-    mainNotImplemented("MainThreadOutputService"),
-    mainNotImplemented("MainThreadProgress"),
-    mainNotImplemented("MainThreadQuickOpen"),
+    main(
+      ~handler=Msg.OutputService.handle,
+      ~mapper=msg => Msg.OutputService(msg),
+      "MainThreadOutputService",
+    ),
+    main(
+      ~handler=Msg.Progress.handle,
+      ~mapper=msg => Msg.Progress(msg),
+      "MainThreadProgress",
+    ),
+    main(
+      ~handler=Msg.QuickOpen.handle,
+      ~mapper=msg => Msg.QuickOpen(msg),
+      "MainThreadQuickOpen",
+    ),
     main(
       ~handler=Msg.StatusBar.handle,
       ~mapper=msg => Msg.StatusBar(msg),
@@ -135,16 +163,28 @@ let handlers =
     mainNotImplemented("MainThreadWebviews"),
     mainNotImplemented("MainThreadUrls"),
     mainNotImplemented("MainThreadWorkspace"),
-    mainNotImplemented("MainThreadFileSystem"),
+    main(
+      ~handler=Msg.FileSystem.handle,
+      ~mapper=msg => Msg.FileSystem(msg),
+      "MainThreadFileSystem",
+    ),
     main(
       ~handler=Msg.ExtensionService.handle,
       ~mapper=msg => Msg.ExtensionService(msg),
       "MainThreadExtensionService",
     ),
-    mainNotImplemented("MainThreadSCM"),
+    main(
+      ~handler=Msg.SCM.handle,
+      ~mapper=msg => Msg.SCM(msg),
+      "MainThreadSCM",
+    ),
     mainNotImplemented("MainThreadSearch"),
     mainNotImplemented("MainThreadTask"),
-    mainNotImplemented("MainThreadWindow"),
+    main(
+      ~handler=Msg.Window.handle,
+      ~mapper=msg => Msg.Window(msg),
+      "MainThreadWindow",
+    ),
     mainNotImplemented("MainThreadLabelService"),
     mainNotImplemented("MainThreadNotebook"),
     mainNotImplemented("MainThreadTheming"),

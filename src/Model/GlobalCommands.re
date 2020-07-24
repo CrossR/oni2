@@ -46,12 +46,6 @@ module Editor = {
         Command("editor.action.detectIndentation"),
       );
 
-    let clipboardPasteAction =
-      register(
-        "editor.action.clipboardPasteAction",
-        Command("editor.action.clipboardPasteAction"),
-      );
-
     let indentLines =
       register(
         "editor.action.indentLines",
@@ -76,6 +70,14 @@ module List = {
 };
 
 module Oni = {
+  let changelog =
+    register(
+      ~category="Help",
+      ~title="Open changelog",
+      "oni.changelog",
+      Command("oni.changelog"),
+    );
+
   module Explorer = {
     let toggle =
       register(
@@ -106,24 +108,6 @@ module Oni = {
       );
   };
 
-  module Sneak = {
-    let start =
-      register(
-        ~category="Sneak",
-        ~title="Enter sneak mode (keyboard-accessible UI)",
-        "sneak.start",
-        Command("sneak.start"),
-      );
-
-    let stop =
-      register(
-        ~category="Sneak",
-        ~title="Exit sneak mode",
-        "sneak.stop",
-        Command("sneak.stop"),
-      );
-  };
-
   module System = {
     let addToPath =
       register(
@@ -141,24 +125,6 @@ module Oni = {
         ~isEnabledWhen=WhenExpr.parse("isMac && symLinkExists"), // NOTE: symLinkExists only defined in command palette
         "system.removeFromPath",
         Command("system.removeFromPath"),
-      );
-  };
-
-  module View = {
-    let rotateForward =
-      register(
-        ~category="View",
-        ~title="Rotate Windows (Forwards)",
-        "view.rotateForward",
-        Command("view.rotateForward"),
-      );
-
-    let rotateBackward =
-      register(
-        ~category="View",
-        ~title="Rotate Windows (Backwards)",
-        "view.rotateBackward",
-        Command("view.rotateBackward"),
       );
   };
 
@@ -215,32 +181,6 @@ module ReferencesView = {
     );
 };
 
-module View = {
-  let closeEditor =
-    register(
-      ~category="View",
-      ~title="Close Editor",
-      "view.closeEditor",
-      Command("view.closeEditor"),
-    );
-
-  let splitVertical =
-    register(
-      ~category="View",
-      ~title="Split Editor Vertically",
-      "view.splitVertical",
-      Command("view.splitVertical"),
-    );
-
-  let splitHorizontal =
-    register(
-      ~category="View",
-      ~title="Split Editor Horizontally",
-      "view.splitHorizontal",
-      Command("view.splitHorizontal"),
-    );
-};
-
 module Workbench = {
   module Action = {
     let openSettings =
@@ -257,14 +197,6 @@ module Workbench = {
         ~title="Open keybindings file",
         "workbench.action.openDefaultKeybindingsFile",
         OpenConfigFile("keybindings.json"),
-      );
-
-    let selectTheme =
-      register(
-        ~category="Preferences",
-        ~title="Theme Picker",
-        "workbench.action.selectTheme",
-        QuickmenuShow(ThemesPicker),
       );
 
     let showCommands =
@@ -294,22 +226,6 @@ module Workbench = {
         ~title="Go to File...",
         "workbench.action.quickOpen",
         QuickmenuShow(FilesPicker),
-      );
-
-    let nextEditor =
-      register(
-        ~category="View",
-        ~title="Open Next Editor",
-        "workbench.action.nextEditor",
-        Command("workbench.action.nextEditor"),
-      );
-
-    let previousEditor =
-      register(
-        ~category="View",
-        ~title="Open Previous Editor",
-        "workbench.action.previousEditor",
-        Command("workbench.action.previousEditor"),
       );
 
     let quickOpenNavigateNextInEditorPicker =

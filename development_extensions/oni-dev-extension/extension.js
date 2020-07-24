@@ -13,10 +13,17 @@ function activate(context) {
     }
     // Create a simple status bar
     let item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000);
-    item.text = "Developer";
+    item.color = new vscode.ThemeColor("foreground");
+    item.command = "developer.oni.statusBarClicked";
+    item.text = "$(wrench) Developer";
+    item.tooltip = "Hello from oni-dev-extension!";
     item.show();
 
     let cleanup = (disposable) => context.subscriptions.push(disposable);
+
+    cleanup(vscode.commands.registerCommand('developer.oni.statusBarClicked', () => {
+        vscode.window.showWarningMessage('You clicked developer', []);
+    }));
 
     cleanup(vscode.languages.registerDefinitionProvider('oni-dev', {
         provideDefinition: (document, _position, _token) => {
@@ -93,6 +100,15 @@ function activate(context) {
            }]);
         }
     }));
+    
+    cleanup(vscode.commands.registerCommand('developer.oni.showChoiceMessage', () => {
+        vscode.window.showInformationMessage('Hello!', "Option 1", "Option 2", "Option 3")
+        .then((result) => {
+           vscode.window.showInformationMessage('You picked: ' + result); 
+        }, (err) => {
+           vscode.window.showInformationMessage('Cancelled: ' + err); 
+        });
+    }));
 
     cleanup(vscode.commands.registerCommand('developer.oni.showWarning', () => {
         vscode.window.showWarningMessage('This is a warning');
@@ -115,6 +131,35 @@ function activate(context) {
     // This helps us create a test case to validate buffer manipulations
     cleanup(vscode.commands.registerCommand('developer.oni.getBufferText', () => {
         vscode.window.showInformationMessage("fulltext:" + latestText);
+    }));
+    
+    cleanup(vscode.commands.registerCommand('developer.oni.showActiveEditor', () => {
+        vscode.window.showInformationMessage(
+        "Active editor: " + JSON.stringify(vscode.window.activeTextEditor)
+        );
+    }));
+    
+    cleanup(vscode.commands.registerCommand('developer.oni.showVisibleTextEditors', () => {
+        vscode.window.showInformationMessage(
+        "Visible editors: " + JSON.stringify(vscode.window.visibleTextEditors)
+        );
+    }));
+    
+    cleanup(vscode.commands.registerCommand('developer.oni.showQuickPick', () => {
+        vscode.window.showQuickPick([
+            "Item 1",
+            "Item 2",
+            "Item 3",
+        ])
+        .then((selectedItem) => {
+            
+        vscode.window.showInformationMessage(
+        "Quick pick item selected: " + selectedItem);
+        }, (err) => {
+            
+        vscode.window.showErrorMessage(
+        "Quick pick cancelled: " + err);
+        })
     }));
     
     function createResourceUri(relativePath) {

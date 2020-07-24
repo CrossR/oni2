@@ -1,6 +1,8 @@
 open Revery;
 open Oni_Core;
 
+module Log = (val Log.withNamespace("Feature.Notification"));
+
 module Internal = {
   let generateId = {
     let lastId = ref(0);
@@ -53,7 +55,14 @@ let update = (model, msg) => {
 module Effects = {
   let create = (~kind=Info, ~source=?, message) =>
     Isolinear.Effect.createWithDispatch(~name="notification.create", dispatch =>
-      dispatch(Created({id: Internal.generateId(), kind, message, source}))
+      if (Oni_Core.Utility.StringEx.isEmpty(message)) {
+        let source = source |> Option.value(~default="Unknown");
+        Log.warnf(m => m("Received empty notification from %s", source));
+      } else {
+        dispatch(
+          Created({id: Internal.generateId(), kind, message, source}),
+        );
+      }
     );
 
   let dismiss = notification =>
@@ -134,9 +143,7 @@ module View = {
         transform(Transform.[TranslateY(yOffset)]),
       ];
 
-      let text = (~foreground, font: UiFont.t) => [
-        fontFamily(font.fontFile),
-        fontSize(11.),
+      let text = (~foreground) => [
         textWrap(TextWrapping.NoWrap),
         marginLeft(6),
         color(foreground),
@@ -167,7 +174,8 @@ module View = {
       | Info => FontAwesome.infoCircle
       };
 
-    let%component make = (~model, ~background, ~foreground, ~font, ()) => {
+    let%component make =
+                  (~model, ~background, ~foreground, ~font: UiFont.t, ()) => {
       let%hook (yOffset, _animationState, _reset) =
         Hooks.animation(Animations.sequence, ~active=true);
 
@@ -178,14 +186,24 @@ module View = {
         switch (model.source) {
         | Some(text) =>
           let foreground = Color.multiplyAlpha(0.5, foreground);
-          <Text style={Styles.text(~foreground, font)} text />;
+          <Text
+            style={Styles.text(~foreground)}
+            text
+            fontFamily={font.family}
+            fontSize=11.
+          />;
         | None => React.empty
         };
 
       <View style={Styles.container(~background, ~yOffset)}>
         <icon />
         <source />
-        <Text style={Styles.text(~foreground, font)} text={model.message} />
+        <Text
+          style={Styles.text(~foreground)}
+          fontFamily={font.family}
+          fontSize=11.
+          text={model.message}
+        />
       </View>;
     };
   };
@@ -204,18 +222,13 @@ module View = {
           paddingVertical(5),
         ];
 
-        let text = (~foreground, ~font: UiFont.t) => [
-          fontFamily(font.fontFile),
-          fontSize(11.),
+        let text = (~foreground) => [
           textWrap(TextWrapping.NoWrap),
           marginLeft(6),
           color(foreground),
         ];
 
-        let message = (~foreground, ~font) => [
-          flexGrow(1),
-          ...text(~foreground, ~font),
-        ];
+        let message = (~foreground) => [flexGrow(1), ...text(~foreground)];
 
         let closeButton = [alignSelf(`Stretch), paddingHorizontal(5)];
       };
@@ -234,7 +247,7 @@ module View = {
         | Info => FontAwesome.infoCircle
         };
 
-      let make = (~item, ~theme, ~font, ~dispatch, ()) => {
+      let make = (~item, ~theme, ~font: UiFont.t, ~dispatch, ()) => {
         let foreground = Colors.foreground.from(theme);
 
         let icon = () =>
@@ -248,7 +261,12 @@ module View = {
           switch (item.source) {
           | Some(text) =>
             let foreground = Color.multiplyAlpha(0.5, foreground);
-            <Text style={Styles.text(~foreground, ~font)} text />;
+            <Text
+              style={Styles.text(~foreground)}
+              fontFamily={font.family}
+              fontSize=11.
+              text
+            />;
           | None => React.empty
           };
 
@@ -264,7 +282,9 @@ module View = {
           <icon />
           <source />
           <Text
-            style={Styles.message(~foreground, ~font)}
+            style={Styles.message(~foreground)}
+            fontFamily={font.family}
+            fontSize=11.
             text={item.message}
           />
           <closeButton />
@@ -291,23 +311,23 @@ module View = {
         right(0),
       ];
 
-      let title = (~theme, ~font: UiFont.t) => [
-        fontFamily(font.fontFile),
-        fontSize(font.fontSize),
+      let title = (~theme) => [
         color(Colors.PanelTitle.activeForeground.from(theme)),
         margin(8),
       ];
     };
 
-    let make = (~model, ~theme, ~font, ~dispatch, ()) => {
+    let make = (~model, ~theme, ~font: UiFont.t, ~dispatch, ()) => {
       let items = model |> List.map(item => <Item item theme font dispatch />);
 
       let innerElement =
         if (items == []) {
           <View style=Styles.noResultsContainer>
             <Text
-              style={Styles.title(~theme, ~font)}
+              style={Styles.title(~theme)}
               text="No notifications, yet!"
+              fontFamily={font.family}
+              fontSize={font.size}
             />
           </View>;
         } else {

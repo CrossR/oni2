@@ -192,6 +192,36 @@ let parseString = (~default="", json) =>
   | _ => default
   };
 
+let parseFontLigatures = json =>
+  switch (json) {
+  | `Bool(_) as bool => bool
+  | `String(str) =>
+    open Angstrom;
+
+    let quoted = p => char('\'') *> p <* char('\'');
+
+    let isAlphaNumeric = (
+      fun
+      | 'a'..'z'
+      | 'A'..'Z'
+      | '0'..'9' => true
+      | _ => false
+    );
+
+    let alphaString = take_while1(isAlphaNumeric);
+
+    let feature = quoted(alphaString);
+    let spaces = many(char(' '));
+
+    let parse = sep_by(char(',') <* spaces, feature);
+
+    switch (Angstrom.parse_string(~consume=All, parse, str)) {
+    | Ok(list) => `List(list)
+    | Error(_) => `Bool(true)
+    };
+  | _ => `Bool(true)
+  };
+
 type parseFunction =
   (ConfigurationValues.t, Yojson.Safe.t) => ConfigurationValues.t;
 
@@ -209,8 +239,14 @@ let configurationParsers: list(configurationTuple) = [
     "editor.fontFamily",
     (config, json) => {
       ...config,
-      editorFontFamily:
-        parseString(~default=Constants.defaultFontFamily, json),
+      editorFontFile: parseString(~default=Constants.defaultFontFile, json),
+    },
+  ),
+  (
+    "editor.fontLigatures",
+    (config, json) => {
+      ...config,
+      editorFontLigatures: parseFontLigatures(json),
     },
   ),
   (
@@ -342,8 +378,8 @@ let configurationParsers: list(configurationTuple) = [
     "terminal.integrated.fontFamily",
     (config, json) => {
       ...config,
-      terminalIntegratedFontFamily:
-        parseString(~default=Constants.defaultFontFamily, json),
+      terminalIntegratedFontFile:
+        parseString(~default=Constants.defaultFontFile, json),
     },
   ),
   (
@@ -404,22 +440,6 @@ let configurationParsers: list(configurationTuple) = [
     (config, json) => {...config, zenModeSingleFile: parseBool(json)},
   ),
   (
-    "syntax.eagerMaxLines",
-    (config, json) => {
-      ...config,
-      syntaxEagerMaxLines:
-        parseInt(~default=Constants.syntaxEagerMaxLines, json),
-    },
-  ),
-  (
-    "syntax.eagerMaxLineLength",
-    (config, json) => {
-      ...config,
-      syntaxEagerMaxLineLength:
-        parseInt(~default=Constants.syntaxEagerMaxLineLength, json),
-    },
-  ),
-  (
     "ui.shadows",
     (config, json) => {...config, uiShadows: parseBool(json)},
   ),
@@ -438,10 +458,6 @@ let configurationParsers: list(configurationTuple) = [
       vsync:
         parseBool(json) ? Revery.Vsync.Synchronized : Revery.Vsync.Immediate,
     },
-  ),
-  (
-    "experimental.treeSitter",
-    (config, json) => {...config, experimentalTreeSitter: parseBool(json)},
   ),
   (
     "experimental.viml",

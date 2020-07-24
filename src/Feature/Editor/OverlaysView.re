@@ -10,7 +10,6 @@ module BufferHighlights = Oni_Syntax.BufferHighlights;
 module Completions = Feature_LanguageSupport.Completions;
 module Diagnostics = Feature_LanguageSupport.Diagnostics;
 module Diagnostic = Feature_LanguageSupport.Diagnostic;
-module Definition = Feature_LanguageSupport.Definition;
 
 module Styles = {
   open Style;
@@ -51,12 +50,7 @@ let completionsView =
 
 let make =
     (
-      ~buffer,
       ~isActiveSplit,
-      ~hoverDelay,
-      ~isHoverEnabled,
-      ~diagnostics,
-      ~mode,
       ~cursorPosition: Location.t,
       ~editor: Editor.t,
       ~gutterWidth,
@@ -67,54 +61,18 @@ let make =
       ~editorFont: Service_Font.font,
       (),
     ) => {
-  let cursorLine = Index.toZeroBased(cursorPosition.line);
-  let lineCount = Buffer.getNumberOfLines(buffer);
-
-  let (cursorOffset, _cursorCharacterWidth) =
-    if (lineCount > 0 && cursorLine < lineCount) {
-      let cursorLine = Buffer.getLine(cursorLine, buffer);
-
-      let (cursorOffset, width) =
-        BufferViewTokenizer.getCharacterPositionAndWidth(
-          cursorLine,
-          Index.toZeroBased(cursorPosition.column),
-        );
-      (cursorOffset, width);
-    } else {
-      (0, 1);
-    };
-
-  let cursorPixelY =
-    int_of_float(
-      editorFont.measuredHeight
-      *. float(Index.toZeroBased(cursorPosition.line))
-      -. editor.scrollY
-      +. 0.5,
+  let ({pixelX, pixelY}: Editor.pixelPosition, _) =
+    Editor.bufferLineByteToPixel(
+      ~line=Index.toZeroBased(cursorPosition.line),
+      ~byteIndex=Index.toZeroBased(cursorPosition.column),
+      editor,
     );
 
-  let cursorPixelX =
-    int_of_float(
-      gutterWidth
-      +. editorFont.measuredWidth
-      *. float(cursorOffset)
-      -. editor.scrollX
-      +. 0.5,
-    );
+  let cursorPixelY = pixelY |> int_of_float;
+  let cursorPixelX = pixelX +. gutterWidth |> int_of_float;
 
   isActiveSplit
     ? <View style=Styles.bufferViewOverlay>
-        <HoverView
-          x=cursorPixelX
-          y=cursorPixelY
-          delay=hoverDelay
-          isEnabled=isHoverEnabled
-          colors
-          editorFont
-          diagnostics
-          editor
-          buffer
-          mode
-        />
         <completionsView
           completions
           cursorPixelX
