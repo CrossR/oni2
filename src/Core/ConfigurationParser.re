@@ -348,14 +348,6 @@ let configurationParsers: list(configurationTuple) = [
     },
   ),
   (
-    "vsync",
-    (config, json) => {
-      ...config,
-      vsync:
-        parseBool(json) ? Revery.Vsync.Synchronized : Revery.Vsync.Immediate,
-    },
-  ),
-  (
     "experimental.viml",
     (config, json) => {...config, experimentalVimL: parseStringList(json)},
   ),
