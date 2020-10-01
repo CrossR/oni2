@@ -4,29 +4,32 @@
  * Configuration settings for the editor
  */
 
-[@deriving show({with_path: false})]
+[@deriving (show({with_path: false}), to_yojson)]
 type vimUseSystemClipboard = {
   yank: bool,
   delete: bool,
   paste: bool,
 };
 
-[@deriving show({with_path: false})]
+[@deriving (show({with_path: false}), to_yojson)]
 type autoClosingBrackets =
   | Never
   | LanguageDefined;
 
-[@deriving show({with_path: false})]
+[@deriving (show({with_path: false}), to_yojson)]
 type fontSmoothing =
   | Default
   | None
   | Antialiased
   | SubpixelAntialiased;
 
+[@deriving to_yojson]
 type fontLigatures = [ | `Bool(bool) | `List(list(string))];
 
+[@deriving to_yojson]
 type autoReveal = [ | `HighlightAndScroll | `HighlightOnly | `NoReveal];
 
+[@deriving to_yojson]
 type t = {
   editorAutoClosingBrackets: autoClosingBrackets,
   editorDetectIndentation: bool,
@@ -55,7 +58,6 @@ type t = {
   workbenchStatusBarVisible: bool,
   workbenchTreeIndent: int,
   filesExclude: list(string),
-  vsync: Revery.Vsync.t,
   vimUseSystemClipboard,
   uiShadows: bool,
   uiZoom: float,
@@ -102,7 +104,6 @@ let default = {
     delete: false,
     paste: false,
   },
-  vsync: Revery.Vsync.Immediate,
   zenModeHideTabs: true,
   zenModeSingleFile: true,
   experimentalVimL: [],

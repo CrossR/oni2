@@ -486,3 +486,10 @@ let ofFile = filePath =>
   | v => v
   | exception (Yojson.Json_error(msg)) => Error(msg)
   };
+
+let toFile = (filepath, json) => {
+  let jsonString = Yojson.Safe.pretty_to_string(json);
+  let jsonFile = open_out(filepath);
+  Printf.fprintf(jsonFile, "%s\n", jsonString);
+  close_out(jsonFile);
+};

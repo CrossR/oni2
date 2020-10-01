@@ -25,6 +25,8 @@ let start =
   let defaultConfigurationFileName = "configuration.json";
 
   let getConfigurationFile = fileName => {
+    Log.info("Making test file...");
+    ConfigurationParser.toFile("/Users/rcross/test.json", ConfigurationValues.to_yojson(ConfigurationValues.default));
     Filesystem.getOrCreateConfigFile(
       ~overridePath=?configurationFilePath,
       fileName,
