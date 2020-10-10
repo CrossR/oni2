@@ -158,7 +158,7 @@ jobs:
   - script: brew install ragel
   - template: .ci/restore-build-cache.yml
   - template: .ci/swap-xcode.yml
-  - script: sudo xcode-select -s /Applications/Xcode_12.app
+  - script: sudo xcode-select -s /Applications/Xcode_12.2.app
   - script: xcodebuild -version
   - template: .ci/js-build-steps.yml
   - template: .ci/use-esy.yml
@@ -315,7 +315,7 @@ jobs:
   displayName: "MacOS: Validate Release (10.15)"
   dependsOn: 
   - Kickoff
-  - MacOS
+  - MacOS15
   pool:
     vmImage: 'macOS-10.15'
   variables:
